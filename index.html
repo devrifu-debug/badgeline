@@ -301,20 +301,23 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 .dthumb .zoom{position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--fg);box-shadow:var(--shadow);opacity:0;transition:opacity .12s}
 .dthumb:hover .zoom,.dthumb:focus-visible .zoom{opacity:1}
 .dv-back{position:fixed;inset:0;z-index:60;background:rgba(6,10,9,.72);display:grid;place-items:center;padding:16px}
-.dv{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-card);width:min(980px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line)}
+.dv{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-card);width:min(980px,100%);height:min(760px,100%);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line)}
 .dv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
 .dv-head h2{font-size:18px}
-.dv-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;padding:24px 16px;background:var(--stage);background-image:radial-gradient(var(--stage-dot) 1px,transparent 1px);background-size:16px 16px;min-height:280px}
+.dv-stage{position:relative;flex:1;min-height:0;display:flex;padding:24px 92px;background:var(--stage);background-image:radial-gradient(var(--stage-dot) 1px,transparent 1px);background-size:16px 16px;min-height:280px}
+.dv-box{flex:1;min-width:0;min-height:0;display:grid;place-items:center;overflow:hidden}
 .dv-card{display:flex;justify-content:center;animation:dvIn .18s ease-out;min-width:0}
 @keyframes dvIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
-.dv-arrow{flex:none;width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
+.dv-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
 .dv-arrow:hover{border-color:var(--accent);color:var(--accent-ink)}
+.dv-arrow.l{left:24px}.dv-arrow.r{right:24px}
 .dv-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .dv-hint{margin-right:auto}
 @media (max-width:640px){
   .dv-back{padding:8px}
-  .dv-stage{padding:16px 8px}
-  .dv-arrow{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;z-index:2;opacity:.92}
+  .dv{height:100%}
+  .dv-stage{padding:12px 52px}
+  .dv-arrow{width:40px;height:40px}
   .dv-arrow.l{left:6px}.dv-arrow.r{right:6px}
   .dv-hint{display:none}
   .dv-foot .btn{flex:1;justify-content:center}
@@ -2972,9 +2975,9 @@ function DesignView() {
 }
 function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
   const it = items[index]; const n = items.length;
-  const [tpl, setTpl] = useState(it.tpl || null); const touchX = useRef(null);
-  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  useEffect(() => { const r = () => setSize({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  const [tpl, setTpl] = useState(it.tpl || null); const touchX = useRef(null); const boxRef = useRef();
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => { const el = boxRef.current; if (!el) return; const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight })); ro.observe(el); return () => ro.disconnect(); }, []);
   useEffect(() => {
     let alive = true; setTpl(it.tpl || null);
     if (it.savedId) Persist.loadTemplate(it.savedId).then(t => { if (alive && t) { AssetCache.ensure(t); setTpl(t); } }).catch(() => {});
@@ -2985,9 +2988,8 @@ function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
     const k = e => { if (e.key === 'ArrowRight') go_(1); else if (e.key === 'ArrowLeft') go_(-1); else if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   });
-  const two = tpl && hasBack(tpl); const narrow = size.w < 640;
-  const maxW = Math.min(narrow ? size.w - 48 : (two ? 760 : 460), size.w - (narrow ? 48 : 180));
-  const maxH = Math.max(220, size.h - (narrow ? 260 : 250));
+  const two = tpl && hasBack(tpl); const narrow = box.w > 0 && box.w < 420;
+  const maxW = Math.max(120, box.w - 8); const maxH = Math.max(120, box.h - (two && !narrow ? 26 : 8));
   return html`<div className="dv-back" onMouseDown=${e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="dv" role="dialog" aria-modal="true" aria-label=${it.name}
       onTouchStart=${e => { touchX.current = e.touches[0].clientX; }} onTouchEnd=${e => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; touchX.current = null; if (Math.abs(dx) > 45) go_(dx < 0 ? 1 : -1); }}>
@@ -2995,9 +2997,9 @@ function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
         <button className="icon-btn" onClick=${onClose} aria-label="Close"><${Icon} n="x" /></button></div>
       <div className="dv-stage">
         <button className="dv-arrow l" onClick=${() => go_(-1)} aria-label="Previous design"><${Icon} n="left" size=${26} /></button>
-        <div className="dv-card" key=${it.key}>${tpl ? (two && narrow
+        <div className="dv-box" ref=${boxRef}><div className="dv-card" key=${it.key}>${!box.w ? null : tpl ? (two && narrow
           ? html`<div className="stack" style=${{ gap: 10, alignItems: 'center' }}><${CardPreview} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH / 2 - 20} /><${CardPreview} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH / 2 - 20} side="back" /></div>`
-          : html`<${CardSides} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH} />`) : html`<span className="muted">Loading…</span>`}</div>
+          : html`<${CardSides} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH} />`) : html`<span className="muted">Loading…</span>`}</div></div>
         <button className="dv-arrow r" onClick=${() => go_(1)} aria-label="Next design"><${Icon} n="right" size=${26} /></button>
       </div>
       <div className="dv-foot"><span className="small muted dv-hint">Use the arrows${'ontouchstart' in window ? ' or swipe' : ' or ← → keys'} to see other designs</span>
