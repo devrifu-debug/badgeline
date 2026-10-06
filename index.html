@@ -298,6 +298,11 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 }
 
 /* ---- simple 3-step shell ---- */
+.dlgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.dlside{position:sticky;top:12px}
+.gallery.big{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:none}
+.gcard.out .im img{opacity:.4}
+.gcard .badge{font-size:11px}
 .app.simple{display:flex;flex-direction:column;height:100%}
 .app.simple .main{flex:1;min-height:0;padding-bottom:0}
 .shead{display:flex;align-items:center;gap:16px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--line);min-height:62px}
@@ -346,7 +351,8 @@ details.adv:not(.panel) summary{padding:8px 0}
 .dlbtn{width:100%;justify-content:center;height:52px;font-size:16px}
 .issues.sm{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--r)}
 @media (max-width:900px){
-  .two,.two.dl{grid-template-columns:minmax(0,1fr)}
+  .two,.two.dl,.dlgrid{grid-template-columns:minmax(0,1fr)}
+  .dlside{position:static}
   .shead{padding:8px 12px;gap:8px}
   .shead-r{display:none}
   .sbrand b{display:none}
@@ -1549,13 +1555,13 @@ function rowsToInclude() {
   return all.filter(i => !(v.byRow.get(i)?.errors));
 }
 const canvasToBlob = (c, type, q) => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Could not encode image')), type, q));
-async function generateCards() {
+async function generateCards(genOpts = {}) {
   const token = ++genToken;
   let st = S();
-  if (!st.validation || st.validation.rev !== st.rev || st.validation.running) { await runValidation(); st = S(); }
-  const tpl = st.template; const items = rowsToInclude();
+  if (!st.validation || st.validation.rev !== st.rev || st.validation.running) { await runValidation(); st = S(); if (token !== genToken) return; }
+  const tpl = st.template; const items = genOpts.all ? st.dataset.rows.map((_, i) => i) : rowsToInclude();
   GenStore.clear();
-  Store.set({ generation: { status: 'running', done: 0, total: items.length, items, rev: st.rev, started: Date.now() } });
+  Store.set({ generation: { status: 'running', done: 0, total: items.length, items, rev: st.rev, all: !!genOpts.all, started: Date.now() } });
   await AssetCache.ensure(tpl); await ensureFonts(tpl, uniqueChars(st.dataset.rows.flat()));
   const W = 300; const s = W / tpl.card.w; const c = document.createElement('canvas');
   c.width = Math.round(tpl.card.w * s); c.height = Math.round(tpl.card.h * s); const ctx = c.getContext('2d');
@@ -3027,10 +3033,37 @@ function DownloadView() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset);
   if (!tpl || !ds) return html`<div className="page spage"><div className="panel empty"><p>${!tpl ? 'Choose a card design first.' : 'Add your list of people first.'}</p><button className="btn primary" onClick=${() => go(!tpl ? 'templates' : 'import')}>${!tpl ? 'Choose design' : 'Add people'}</button></div></div>`;
   return html`<div className="page spage">
-    <div className="shero"><h1>Check and download</h1><p>Look through the cards, then download them all in one file.</p></div>
-    <div className="two dl"><${SimplePreview} /><${SimpleDownload} /></div>
+    <div className="shero"><h1>Check and download</h1><p>Here is every card. Click a card to see it bigger or fix it, then download them all in one file.</p></div>
+    <div className="dlgrid"><${AllCards} /><div className="dlside"><${SimpleDownload} /></div></div>
     <${StepNav} back="import" />
   </div>`;
+}
+
+function AllCards() {
+  const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const g = useS(s => s.generation); const rev = useS(s => s.rev);
+  const v = useS(s => s.validation); const policy = useS(s => s.errorPolicy); useS(s => s.generation?.done);
+  const [only, setOnly] = useState(false);
+  useEffect(() => {
+    if (g && g.rev === rev && g.all && (g.status === 'running' || g.status === 'done')) return;
+    const t = setTimeout(() => generateCards({ all: true }).catch(e => toast('Could not draw the cards: ' + e.message, 'err')), 250);
+    return () => clearTimeout(t);
+  }, [rev]);
+  const fresh = v && v.rev === rev;
+  const nameKey = tpl.fields.find(f => f.key === 'name') ? 'name' : tpl.fields.find(f => f.type === 'text')?.key;
+  const items = g?.items || []; const running = g?.status === 'running';
+  const problemRows = fresh ? items.filter(i => v.byRow.get(i)) : [];
+  const list = only ? problemRows : items;
+  return html`<section className="panel"><div className="panel-head"><h2>All cards <span className="muted small" style=${{ fontWeight: 400 }}>(${ds.rows.length})</span></h2>
+      ${problemRows.length ? html`<${Seg} label="Show" value=${only} onChange=${setOnly} options=${[[false, 'All'], [true, `With problems (${problemRows.length})`]]} />` : null}</div>
+    <div className="panel-body">
+      ${running ? html`<div className="stack" style=${{ gap: 4 }}><${Progress} value=${g.done / Math.max(1, g.total)} /><span className="small muted num">Drawing cards… ${g.done} of ${g.total}</span></div>` : null}
+      <div className="gallery big">${list.slice(0, running ? g.done : list.length).map(i => { const rs = fresh ? v.byRow.get(i) : null; const out = rs?.errors && policy === 'skip';
+        return html`<button key=${i} className=${'gcard' + (out ? ' out' : '')} onClick=${() => Store.set({ modal: { type: 'card', row: i } })} title=${rs ? rs.list.map(x => x.msg).join('\n') : 'Click to see it bigger'}>
+          <div className="im">${GenStore.thumbs.get(i) ? html`<img src=${GenStore.thumbs.get(i)} alt=${'Card for ' + ((nameKey && cellValue(i, nameKey)) || 'row ' + (i + 1))} loading="lazy" />` : null}
+            ${rs ? html`<span className=${'badge pill ' + (rs.errors ? 'err' : 'warn')}>${out ? 'Left out' : rs.errors ? 'Problem' : 'Check'}</span>` : null}</div>
+          <span className="cap"><span className="faint num">${i + 1}</span><span>${(nameKey && cellValue(i, nameKey)) || '(no name)'}</span></span></button>`; })}</div>
+      ${only && !problemRows.length ? html`<p className="small muted">No cards with problems.</p>` : null}
+    </div></section>`;
 }
 function SimplePreview() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const row = useS(s => s.previewRow); const v = useS(s => s.validation); const rev = useS(s => s.rev);
@@ -3992,13 +4025,14 @@ function RowEditor({ row, onClose, isNew }) {
 }
 function CardModal({ row, onClose }) {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const items = useS(s => s.generation?.items) || [];
-  const idx = items.indexOf(row);
+  const v = useS(s => s.validation); const rev = useS(s => s.rev); const rs = v && v.rev === rev ? v.byRow.get(row) : null;
+  const idx = items.indexOf(row); const nm = cellValue(row, 'name');
   const nav = d => { const n = items[idx + d]; if (n != null) Store.set({ modal: { type: 'card', row: n } }); };
   useEffect(() => { const k = e => { if (e.key === 'ArrowRight') nav(1); if (e.key === 'ArrowLeft') nav(-1); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); });
-  return html`<${Modal} title=${`Card ${idx + 1} of ${items.length} · row ${row + 1}`} onClose=${onClose} foot=${html`<${Fragment}><button className="btn" disabled=${idx <= 0} onClick=${() => nav(-1)}><${Icon} n="left" />Previous</button><button className="btn" disabled=${idx >= items.length - 1} onClick=${() => nav(1)}>Next<${Icon} n="right" /></button><span className="grow"></span><button className="btn" onClick=${() => Store.set({ modal: { type: 'row', row } })}><${Icon} n="edit" />Edit row</button><button className="btn primary" onClick=${() => runExport({ ...S().exportCfg, format: 'single-png' }, [row])}><${Icon} n="download" />Save PNG</button><//>`}>
+  return html`<${Modal} title=${`${nm || 'Card ' + (row + 1)} · ${idx + 1} of ${items.length}`} onClose=${onClose} foot=${html`<${Fragment}><button className="btn" disabled=${idx <= 0} onClick=${() => nav(-1)}><${Icon} n="left" />Previous</button><button className="btn" disabled=${idx >= items.length - 1} onClick=${() => nav(1)}>Next<${Icon} n="right" /></button><span className="grow"></span><button className="btn" onClick=${() => Store.set({ modal: { type: 'row', row } })}><${Icon} n="edit" />Edit details</button><button className="btn primary" onClick=${() => runExport({ ...S().exportCfg, format: 'single-png' }, [row])}><${Icon} n="download" />Save PNG</button><//>`}>
     <div className="preview-box"><${CardSides} tpl=${tpl} row=${row} maxW=${hasBack(tpl) ? 680 : 460} maxH=${480} /></div>
+    ${rs ? html`<div className="stack" style=${{ gap: 4 }}>${rs.list.map((x, i) => html`<div key=${i} className=${'banner ' + (x.severity === 'error' ? 'err' : 'warn')} style=${{ padding: '7px 12px' }}><${Icon} n="alert" size=${14} /><span className="grow">${x.msg}</span></div>`)}</div>` : null}
     <${PhotoChanger} row=${row} />
-    <p className="tiny muted">Changes show up in the export straight away. Press Regenerate to refresh the thumbnails.</p>
   <//>`;
 }
 const openDesignUpload = (replace = false) => Store.set({ modal: { type: 'design', replace } });
