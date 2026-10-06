@@ -530,6 +530,10 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 .slider input{width:100%;accent-color:var(--fg)}
 .layer.sel{background:var(--accent-soft)}
 .grid-sel{border:0;background:none;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;padding:0 2px}
+.filters.full{width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.filters.full::-webkit-scrollbar{display:none}
+.filters.full button{flex:1 0 auto;white-space:nowrap}
+.shero-row .shero.big{flex:1 1 auto}
 </style>
 
 </head>
@@ -3257,7 +3261,8 @@ function DesignView() {
   const items = [...list.map(t => ({ key: t.id, name: t.name, savedId: t.id })), ...shown.map(s => ({ key: s.key, name: s.name, tpl: s.tpl, make: s.make }))];
   const open = key => setView(items.findIndex(i => i.key === key));
   return html`<div className="page spage">
-    <div className="shero big"><h1>Choose a card design</h1></div>
+    <div className="shero-row"><div className="shero big"><h1>Choose a card design</h1></div>
+      <div className="row nowrap topnav"><button className="btn" onClick=${() => openDesignUpload(false)}><${Icon} n="upload" />Upload my design</button><button className="btn" onClick=${() => openInEditor('new')}><${Icon} n="plus" />Blank card</button></div></div>
     ${list.length ? html`<section className="stack" style=${{ gap: 12 }}><h2>My designs</h2>
       <div className="dgrid">${list.map(t => html`<article key=${t.id} className=${'dcard' + (cur?.id === t.id ? ' on' : '')}>
         <button className="dthumb" onClick=${() => open(t.id)} aria-label=${'See ' + t.name + ' bigger'}>${t.thumb ? html`<img src=${t.thumb} alt="" />` : html`<${Icon} n="cards" size=${28} />`}<span className="zoom"><${Icon} n="zoomIn" size=${16} /></span></button>
@@ -3265,9 +3270,7 @@ function DesignView() {
           <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => openSaved(t.id)}>Use</button><button className="btn sm" onClick=${() => openSaved(t.id, true)}>Edit</button>
           <${ConfirmBtn} label="" confirm="Delete design?" onConfirm=${async () => { await Persist.deleteTemplate(t.id); await refreshTemplates(); toast('Design deleted'); }} /></div></div></article>`)}</div></section>` : null}
     <section className="stack" style=${{ gap: 12 }}>
-      <div className="row" style=${{ justifyContent: 'space-between' }}><h2>Ready-made designs</h2>
-        <div className="row"><button className="btn" onClick=${() => openDesignUpload(false)}><${Icon} n="upload" />Upload my design</button><button className="btn ghost" onClick=${() => openInEditor('new')}><${Icon} n="plus" />Blank card</button></div></div>
-      <div className="filters" role="group" aria-label="Filter designs">${STARTER_TAGS.filter(t => t === 'All' || STARTERS.some(s => s.tags.includes(t))).map(t => html`<button key=${t} aria-pressed=${tag === t} onClick=${() => setTag(t)}>${t}</button>`)}</div>
+      <div className="filters full" role="group" aria-label="Filter designs">${STARTER_TAGS.filter(t => t === 'All' || STARTERS.some(s => s.tags.includes(t))).map(t => html`<button key=${t} aria-pressed=${tag === t} onClick=${() => setTag(t)}>${t}</button>`)}</div>
       <div className="dgrid">${shown.map(s => html`<article key=${s.key} className="dcard">
         <button className="dthumb" onClick=${() => open(s.key)} aria-label=${'See ' + s.name + ' bigger'}><${CardPreview} tpl=${s.tpl} row=${null} useData=${false} maxW=${150} maxH=${150} /><span className="zoom"><${Icon} n="zoomIn" size=${16} /></span></button>
         <div className="dmeta"><span className="dname">${s.name}</span>
