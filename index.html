@@ -2985,7 +2985,6 @@ function PeopleView() {
         <div className="row"><input className="inp" style=${{ width: 220 }} placeholder="Search…" value=${q} onChange=${e => setQ(e.target.value)} aria-label="Search people" />
         <button className="btn sm" onClick=${addPerson}><${Icon} n="plus" size=${14} />Add person</button></div></div>
       <div className="panel-body"><p className="tiny muted">Click any cell to change it. Click a row number to see that person's card or change their photo.</p><${DataTable} ds=${ds} query=${q} height=${340} /></div></section>` : null}
-    <${StepNav} back="templates" next="generate" nextLabel="Next: check and download" nextDisabled=${!ds?.rows.length} />
   </div>`;
 }
 function SimplePhotos() {
@@ -3040,7 +3039,6 @@ function DownloadView() {
     <div className="shero-row"><div className="shero"><h1>Check and download</h1><p>Here is every card. Click a card to see it bigger or fix it, then download them all in one file.</p></div>
       <div className="row nowrap topnav"><button className="btn" onClick=${() => go('import')}><${Icon} n="left" />Back</button></div></div>
     <div className="dlgrid"><${AllCards} /><div className="dlside"><${SimpleDownload} /></div></div>
-    <${StepNav} back="import" />
   </div>`;
 }
 
