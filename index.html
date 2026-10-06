@@ -313,6 +313,13 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 .dv-arrow.l{left:24px}.dv-arrow.r{right:24px}
 .dv-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
 .dv-hint{margin-right:auto}
+.switch{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer;margin-right:12px}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .tr{width:36px;height:20px;border-radius:999px;background:var(--line-2);position:relative;transition:background .15s;flex:none}
+.switch .tr::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.switch input:checked + .tr{background:var(--accent)}
+.switch input:checked + .tr::after{transform:translateX(16px)}
+.switch input:focus-visible + .tr{outline:2px solid var(--accent);outline-offset:2px}
 @media (max-width:640px){
   .dv-back{padding:8px}
   .dv{height:100%}
@@ -2506,35 +2513,135 @@ function starterVolunteer() {
   }, { bg: '#FEFCE8' });
 }
 
-const STARTER_TAGS = ['All', 'Portrait', 'Landscape', 'Two-sided', 'Office', 'School', 'Event', 'Security', 'Health', 'Industry', 'Membership', 'Bangla'];
+
+/* Back sides for the ready-made designs: same colours, fonts and shapes as each front.
+   Fixed text (return address, terms) is the same on every card; the QR code carries the person's ID. */
+const BACK_TEXT = {
+  en: { found: 'If found, please return to:', terms: 'Terms of use', sig: 'Authorised signature',
+    terms3: ['This card is not transferable.', 'Show it on request inside the premises.', 'Report a lost card immediately.'],
+    addr: b => [b, 'House 12, Road 5, Dhanmondi, Dhaka 1209', 'Phone: +880 2-000-0000'] },
+  bn: { found: 'কার্ডটি পাওয়া গেলে নিচের ঠিকানায় ফেরত দিন:', terms: 'নিয়মাবলি', sig: 'প্রধান শিক্ষকের স্বাক্ষর',
+    terms3: ['এই কার্ড হস্তান্তরযোগ্য নয়।', 'বিদ্যালয়ে সবসময় সঙ্গে রাখতে হবে।', 'হারিয়ে গেলে অফিসে জানাতে হবে।'],
+    addr: b => [b, 'খুলনা, বাংলাদেশ', 'ফোন: +৮৮০ ১৭০০-০০০০০০'] },
+};
+function addBack(t, o) {
+  const c = t.card, W = c.w, H = c.h, port = H >= W; const f = port ? W / 54 : W / 85.6;
+  const L = BACK_TEXT[o.lang || 'en']; const dark = !!o.dark;
+  const P = o.P, A = o.A || o.P, font = o.font || 'Poppins', body = o.body || (o.lang === 'bn' ? 'Hind Siliguri' : 'Inter');
+  const head = dark ? '#FFFFFF' : (o.ink || '#1D1F24'), muted = dark ? '#A3ACB9' : '#5B6470';
+  const T = (x) => makeEl('text', c, { font: body, weight: 500, color: muted, align: 'left', valign: 'middle', minSize: 3.6, ...x, size: (x.size || 5.4) * f });
+  const R = (x) => makeEl('rect', c, { radius: 0, locked: true, ...x });
+  const els = []; const m = (port ? 4.3 : 5.5) * f;
+  let x0 = m, y0, colW = port ? W - 2 * m : W * 0.58 - m;
+  // decoration that mirrors the front
+  if (o.style === 'hazard') {
+    for (const y of [-4 * f, H - 11.6 * f]) for (let i = 0; i < Math.ceil(W / (8 * f)) + 2; i++) els.push(R({ name: 'Stripe', x: -6 * f + i * 8 * f, y, w: 3.6 * f, h: 16 * f, fill: A, rotation: 35 }));
+    els.push(R({ name: 'Panel', x: 0, y: 8 * f, w: W, h: H - 16 * f, fill: '#FFFFFF' }));
+    els.push(T({ name: 'Brand', x: m, y: 11 * f, w: W - 2 * m, h: 4.5 * f, text: o.brand, font, weight: 800, size: 7, color: '#111111', align: port ? 'center' : 'left', letterSpacing: 0.12 }));
+    y0 = 18.5 * f;
+  } else if (o.style === 'side') {
+    const sw = (port ? 6 : 6) * f; els.push(R({ name: 'Side band', x: 0, y: 0, w: sw, h: H, fill: P }));
+    x0 = sw + m * 0.9; colW = port ? W - x0 - m : W * 0.58 - x0;
+    els.push(T({ name: 'Brand', x: x0, y: m, w: W - x0 - m, h: 5 * f, text: o.brand, font, weight: 800, size: 7.5, color: P }));
+    els.push(R({ name: 'Brand rule', x: x0, y: m + 6 * f, w: 12 * f, h: 0.7 * f, fill: A }));
+    y0 = m + 10 * f;
+  } else if (o.style === 'minimal') {
+    els.push(R({ name: 'Border', x: 3, y: 3, w: W - 6, h: H - 6, fill: 'none', stroke: P, strokeWidth: 0.3, radius: 2 }));
+    els.push(T({ name: 'Brand', x: m, y: 7 * f, w: W - 2 * m, h: 4.5 * f, text: o.brand, font, weight: 700, size: 7, color: P, align: 'center', letterSpacing: 0.1 }));
+    els.push(makeEl('line', c, { name: 'Rule', x: W / 2 - 10 * f, y: 12.5 * f, w: 20 * f, h: 1, stroke: P, strokeWidth: 0.2 }));
+    x0 = m + 2; colW = port ? W - 2 * x0 : W * 0.58 - x0; y0 = 16 * f;
+  } else if (o.style === 'diag') {
+    els.push(R({ name: 'Top diagonal', x: -0.37 * W, y: -0.36 * H, w: 1.85 * W, h: 0.5 * H, fill: P, rotation: -14 }));
+    els.push(R({ name: 'Diagonal accent', x: 0.2 * W, y: 0.12 * H, w: 1.2 * W, h: 1.4 * f, fill: A, rotation: -14 }));
+    els.push(T({ name: 'Brand', x: m, y: 4 * f, w: W * 0.7, h: 4.5 * f, text: o.brand, font, weight: 800, size: 7, color: '#FFFFFF', letterSpacing: 0.1 }));
+    y0 = port ? 0.25 * H : 0.33 * H;
+  } else if (dark) {
+    els.push(R({ name: 'Top bar', x: 0, y: 0, w: W, h: 2.4 * f, fill: A }));
+    els.push(T({ name: 'Brand', x: m, y: 5.5 * f, w: W - 2 * m, h: 5 * f, text: o.brand, font, weight: 800, size: 8, color: A, align: port ? 'center' : 'left', letterSpacing: 0.08 }));
+    y0 = 14 * f;
+  } else { // top band
+    const bh = (port ? 13.5 : 10.5) * f; els.push(R({ name: 'Top band', x: 0, y: 0, w: W, h: bh, fill: P }));
+    if (A !== P) els.push(R({ name: 'Band accent', x: 0, y: bh, w: W, h: 1.1 * f, fill: A }));
+    els.push(T({ name: 'Brand', x: m, y: bh * 0.22, w: W - 2 * m, h: bh * 0.56, text: o.brand, font, weight: 800, size: port ? 8.5 : 8, color: '#FFFFFF', align: port ? 'center' : 'left', letterSpacing: 0.06 }));
+    y0 = bh + 4 * f;
+  }
+  // fixed text block
+  const lh = 3.7 * f; let y = y0;
+  els.push(T({ name: 'Return heading', x: x0, y, w: colW, h: lh, text: L.found, weight: 700, size: 5.8, color: head })); y += lh + 0.6 * f;
+  L.addr(o.org || o.brandTitle || o.brand).forEach((ln, i) => { els.push(T({ name: 'Return address ' + (i + 1), x: x0, y, w: colW, h: lh, text: ln, size: 5.2 })); y += lh; });
+  y += 1.6 * f; els.push(makeEl('line', c, { name: 'Divider', x: x0, y, w: Math.min(colW, 26 * f), h: 1, stroke: dark ? '#3A4452' : '#CBD2D9', strokeWidth: 0.25 })); y += 2.2 * f;
+  els.push(T({ name: 'Terms heading', x: x0, y, w: colW, h: lh, text: L.terms, weight: 700, size: 5.8, color: head })); y += lh + 0.4 * f;
+  (o.terms || L.terms3).forEach((ln, i) => { els.push(T({ name: 'Term ' + (i + 1), x: x0, y, w: colW, h: lh, text: '•  ' + ln, size: 5 })); y += lh; });
+  // QR code + signature line
+  const idKey = t.fields.some(x => x.key === 'employee_id') ? 'employee_id' : t.fields.some(x => x.key === 'card_no') ? 'card_no' : t.fields.some(x => x.key === 'roll') ? 'roll' : 'name';
+  const q = Math.min(port ? 15 * f : 15 * f, port ? W * 0.3 : H * 0.34);
+  const bottomPad = (o.style === 'hazard' ? 11 : port ? 6.5 : 6) * f;
+  const qx = port ? x0 : W - m - q, qy = port ? H - bottomPad - q : (o.style === 'diag' ? H * 0.36 : y0);
+  els.push(R({ name: 'QR backing', x: qx - 0.8 * f, y: qy - 0.8 * f, w: q + 1.6 * f, h: q + 1.6 * f, fill: '#FFFFFF', radius: 1, locked: false }));
+  els.push(makeEl('barcode', c, { name: 'QR code', x: qx, y: qy, w: q, h: q, symbology: 'qr', text: '{{' + idKey + '}}', showText: false }));
+  const sw = port ? W - x0 - m - q - 5 * f : q + 8 * f; const sx = port ? W - m - sw : W - m - sw; const sy = port ? H - bottomPad - 4.2 * f : H - bottomPad - 4.2 * f;
+  els.push(makeEl('line', c, { name: 'Signature line', x: sx, y: sy, w: sw, h: 1, stroke: muted, strokeWidth: 0.25 }));
+  els.push(T({ name: 'Signature label', x: sx, y: sy + 0.8 * f, w: sw, h: 3 * f, text: L.sig, size: 4.4, align: 'center' }));
+  // closing bar like the front
+  if (!['hazard', 'minimal', 'side'].includes(o.style)) els.push(R({ name: 'Bottom bar', x: 0, y: H - 2.6 * f, w: W, h: 2.6 * f, fill: dark ? A : P }));
+  t.back = { bg: { color: o.style === 'hazard' ? '#111111' : (o.bg || (dark ? o.P : '#FFFFFF')), imageId: null, fit: 'cover' }, elements: els };
+  return t;
+}
+const BACKS = {
+  round: { brand: 'NORTHGATE', P: '#23255E', A: '#F2A21B', font: 'Montserrat' },
+  diagonal: { brand: 'GREENLINE GROUP', P: '#2A9D8F', A: '#E9C46A', ink: '#1E293B', font: 'Montserrat', style: 'diag' },
+  minimal: { brand: 'HALVORSEN & CO.', P: '#1F2937', font: 'Playfair Display', style: 'minimal', bg: '#FAFAF7' },
+  fullphoto: { brand: 'ORBIT LABS', P: '#111827', A: '#22D3EE', font: 'Montserrat', dark: true },
+  vertical: { brand: 'NORDLAND MEDIA', P: '#1D3557', A: '#A8DADC', font: 'Montserrat', style: 'side', bg: '#EEF2F7' },
+  staff: { brand: 'HALDEN RIDGE', P: '#0E3B36', A: '#E2A93B', font: 'Montserrat' },
+  security: { brand: 'SECURITY ACCESS', org: 'Security Office', P: '#0F1724', A: '#F5C518', font: 'Oswald', dark: true, terms: ['Wear this card where it can be seen.', 'Do not lend it to anyone.', 'Report a lost card to Security at once.'] },
+  medical: { brand: 'Green Valley Hospital', P: '#0E7C86', font: 'Poppins' },
+  event: { brand: 'Dhaka Design Week 2026', P: '#6C2BD9', A: '#C4B5FD', font: 'Poppins', style: 'side', terms: ['Valid for event staff only.', 'Wear it at all times on site.', 'Return it at the end of the event.'] },
+  visitor: { brand: 'VISITOR', org: 'Lakeside Tower Reception', P: '#E63946', font: 'Oswald', terms: ['Return this pass when you leave.', 'Stay with your host at all times.', 'Valid for the date shown only.'] },
+  landscape: { brand: 'BRIGHTWAVE', P: '#0B6E6E', A: '#6FD3B8', font: 'Montserrat' },
+  lround: { brand: 'MERIDIAN', P: '#14213D', A: '#FCA311', font: 'Montserrat', dark: true },
+  pass: { brand: 'CORVEN LOGISTICS', P: '#1F3A5F', A: '#E0A030', font: 'Oswald' },
+  student: { brand: 'Riverside High School', P: '#B3261E', A: '#F2C230', font: 'Oswald', terms: ['This card is not transferable.', 'Carry it at school every day.', 'Report a lost card to the office.'] },
+  member: { brand: 'THE ARCADE CLUB', P: '#0B0B0B', A: '#C9A227', font: 'Playfair Display', dark: true, terms: ['Membership is personal.', 'Show this card at the front desk.', 'Club rules apply to all members.'] },
+  neon: { brand: 'PIXELFORGE', P: '#0B1020', A: '#06B6D4', font: 'Montserrat', dark: true },
+  bnschool: { brand: 'আদর্শ উচ্চ বিদ্যালয়', P: '#006A4E', A: '#F42A41', font: 'Hind Siliguri', lang: 'bn' },
+  industrial: { brand: 'IRONWORKS LTD.', P: '#111111', A: '#FACC15', font: 'Montserrat', style: 'hazard', terms: ['Wear protective gear on site.', 'This card is not transferable.', 'Report a lost card to HR.'] },
+  press: { brand: 'PRESS', org: 'Media Centre', P: '#111111', A: '#DC2626', font: 'Oswald', terms: ['Valid for accredited media only.', 'Wear it visibly at all times.', 'Access may be checked at any time.'] },
+  conference: { brand: 'BUILD SUMMIT 2026', org: 'Build Summit Help Desk', P: '#FF5A36', A: '#111827', font: 'Barlow Condensed', terms: ['Badge must be worn at all sessions.', 'Not transferable to another person.', 'Lost badges cannot be replaced.'] },
+  volunteer: { brand: 'VOLUNTEER', org: 'Clean City Drive 2026', P: '#166534', A: '#FDE047', font: 'Poppins', bg: '#FEFCE8', terms: ['Thank you for helping today!', 'Wear this badge while on duty.', 'Ask a team lead if you need help.'] },
+  ticket: { brand: 'NIGHT MARKET FEST', P: '#EA580C', A: '#FDBA74', font: 'Oswald', bg: '#FFF7ED', terms: ['One entry per pass.', 'Keep this pass with you.', 'No refunds or transfers.'] },
+  gym: { brand: 'IRON PULSE', P: '#111111', A: '#A3E635', font: 'Barlow Condensed', dark: true, terms: ['Membership is personal.', 'Scan this card at the door.', 'Follow gym rules at all times.'] },
+  library: { brand: 'CITY PUBLIC LIBRARY', P: '#7C2D12', A: '#D6D3D1', font: 'Merriweather', style: 'side', bg: '#FDFBF6', terms: ['Return books within 14 days.', 'You are responsible for lost books.', 'Report a lost card at the desk.'] },
+};
+const STARTER_TAGS = ['All', 'Portrait', 'Landscape', 'Office', 'School', 'Event', 'Security', 'Health', 'Industry', 'Membership', 'Bangla'];
 const STARTERS = [
   { key: 'travel', name: 'Staff ID · front & back', make: starterTravel, tags: ['Portrait', 'Two-sided', 'Office'] },
-  { key: 'round', name: 'Staff ID · round photo', make: starterRound, tags: ['Portrait', 'Office'] },
-  { key: 'diagonal', name: 'Diagonal corporate', make: starterDiagonal, tags: ['Portrait', 'Office'] },
-  { key: 'minimal', name: 'Minimal', make: starterMinimal, tags: ['Portrait', 'Office'] },
-  { key: 'fullphoto', name: 'Full photo', make: starterFullPhoto, tags: ['Portrait', 'Office'] },
-  { key: 'vertical', name: 'Vertical name', make: starterVerticalName, tags: ['Portrait', 'Office'] },
-  { key: 'staff', name: 'Staff ID · portrait', make: starterStaff, tags: ['Portrait', 'Office'] },
-  { key: 'security', name: 'Security access', make: starterSecurity, tags: ['Portrait', 'Security'] },
-  { key: 'medical', name: 'Medical staff', make: starterMedical, tags: ['Portrait', 'Health'] },
-  { key: 'event', name: 'Event staff pass', make: starterEvent, tags: ['Portrait', 'Event'] },
-  { key: 'visitor', name: 'Visitor pass', make: starterVisitor, tags: ['Portrait', 'Event', 'Security'] },
-  { key: 'landscape', name: 'Landscape · photo left', make: starterLandscape, tags: ['Landscape', 'Office'] },
-  { key: 'lround', name: 'Landscape · round photo', make: starterLandscapeRound, tags: ['Landscape', 'Office'] },
-  { key: 'pass', name: 'Staff pass · landscape', make: starterPass, tags: ['Landscape', 'Office'] },
-  { key: 'student', name: 'Student ID', make: starterStudent, tags: ['Landscape', 'School'] },
-  { key: 'member', name: 'Member card', make: starterMember, tags: ['Landscape', 'Membership'] },
-  { key: 'neon', name: 'Tech · neon', make: starterNeon, tags: ['Portrait', 'Office'] },
+  { key: 'round', name: 'Staff ID · round photo', make: () => addBack(starterRound(), BACKS.round), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'diagonal', name: 'Diagonal corporate', make: () => addBack(starterDiagonal(), BACKS.diagonal), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'minimal', name: 'Minimal', make: () => addBack(starterMinimal(), BACKS.minimal), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'fullphoto', name: 'Full photo', make: () => addBack(starterFullPhoto(), BACKS.fullphoto), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'vertical', name: 'Vertical name', make: () => addBack(starterVerticalName(), BACKS.vertical), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'staff', name: 'Staff ID · portrait', make: () => addBack(starterStaff(), BACKS.staff), tags: ['Portrait', 'Two-sided', 'Office'] },
+  { key: 'security', name: 'Security access', make: () => addBack(starterSecurity(), BACKS.security), tags: ['Portrait', 'Two-sided', 'Security'] },
+  { key: 'medical', name: 'Medical staff', make: () => addBack(starterMedical(), BACKS.medical), tags: ['Portrait', 'Two-sided', 'Health'] },
+  { key: 'event', name: 'Event staff pass', make: () => addBack(starterEvent(), BACKS.event), tags: ['Portrait', 'Two-sided', 'Event'] },
+  { key: 'visitor', name: 'Visitor pass', make: () => addBack(starterVisitor(), BACKS.visitor), tags: ['Portrait', 'Two-sided', 'Event', 'Security'] },
+  { key: 'landscape', name: 'Landscape · photo left', make: () => addBack(starterLandscape(), BACKS.landscape), tags: ['Landscape', 'Two-sided', 'Office'] },
+  { key: 'lround', name: 'Landscape · round photo', make: () => addBack(starterLandscapeRound(), BACKS.lround), tags: ['Landscape', 'Two-sided', 'Office'] },
+  { key: 'pass', name: 'Staff pass · landscape', make: () => addBack(starterPass(), BACKS.pass), tags: ['Landscape', 'Two-sided', 'Office'] },
+  { key: 'student', name: 'Student ID', make: () => addBack(starterStudent(), BACKS.student), tags: ['Landscape', 'Two-sided', 'School'] },
+  { key: 'member', name: 'Member card', make: () => addBack(starterMember(), BACKS.member), tags: ['Landscape', 'Two-sided', 'Membership'] },
+  { key: 'neon', name: 'Tech · neon', make: () => addBack(starterNeon(), BACKS.neon), tags: ['Portrait', 'Two-sided', 'Office'] },
   { key: 'university', name: 'University ID · front & back', make: starterUniversity, tags: ['Portrait', 'Two-sided', 'School'] },
   { key: 'corpduplex', name: 'Corporate · front & back', make: starterCorporateDuplex, tags: ['Landscape', 'Two-sided', 'Office'] },
-  { key: 'bnschool', name: 'স্কুল আইডি · Bangla school ID', make: starterBanglaSchool, tags: ['Portrait', 'School', 'Bangla'] },
-  { key: 'industrial', name: 'Factory worker ID', make: starterIndustrial, tags: ['Portrait', 'Industry', 'Security'] },
-  { key: 'press', name: 'Press pass', make: starterPress, tags: ['Portrait', 'Event', 'Security'] },
-  { key: 'conference', name: 'Conference badge · A7', make: starterConference, tags: ['Portrait', 'Event'] },
-  { key: 'volunteer', name: 'Volunteer badge', make: starterVolunteer, tags: ['Portrait', 'Event'] },
-  { key: 'ticket', name: 'Event ticket pass', make: starterTicket, tags: ['Landscape', 'Event'] },
-  { key: 'gym', name: 'Gym membership', make: starterGym, tags: ['Landscape', 'Membership'] },
-  { key: 'library', name: 'Library card', make: starterLibrary, tags: ['Landscape', 'School', 'Membership'] },
+  { key: 'bnschool', name: 'স্কুল আইডি · Bangla school ID', make: () => addBack(starterBanglaSchool(), BACKS.bnschool), tags: ['Portrait', 'Two-sided', 'School', 'Bangla'] },
+  { key: 'industrial', name: 'Factory worker ID', make: () => addBack(starterIndustrial(), BACKS.industrial), tags: ['Portrait', 'Two-sided', 'Industry', 'Security'] },
+  { key: 'press', name: 'Press pass', make: () => addBack(starterPress(), BACKS.press), tags: ['Portrait', 'Two-sided', 'Event', 'Security'] },
+  { key: 'conference', name: 'Conference badge · A7', make: () => addBack(starterConference(), BACKS.conference), tags: ['Portrait', 'Two-sided', 'Event'] },
+  { key: 'volunteer', name: 'Volunteer badge', make: () => addBack(starterVolunteer(), BACKS.volunteer), tags: ['Portrait', 'Two-sided', 'Event'] },
+  { key: 'ticket', name: 'Event ticket pass', make: () => addBack(starterTicket(), BACKS.ticket), tags: ['Landscape', 'Two-sided', 'Event'] },
+  { key: 'gym', name: 'Gym membership', make: () => addBack(starterGym(), BACKS.gym), tags: ['Landscape', 'Two-sided', 'Membership'] },
+  { key: 'library', name: 'Library card', make: () => addBack(starterLibrary(), BACKS.library), tags: ['Landscape', 'Two-sided', 'School', 'Membership'] },
 ];
 const EXAMPLE_COLUMNS = ['Name', 'Job Title', 'Employee ID', 'Department', 'Blood Group', 'Phone', 'Email', 'Photo', 'Date of Birth', 'Valid Thru', 'Card No', 'Signature'];
 const EXAMPLE_ROWS = [
@@ -2948,7 +3055,8 @@ function DesignView() {
   const [view, setView] = useState(null);
   const shown = tag === 'All' ? starters : starters.filter(s => s.tags.includes(tag));
   const pick = t => { useTemplate(t, { silent: true }); go('import'); };
-  const openSaved = async (id, edit) => { try { const t = await Persist.loadTemplate(id); if (!t) return; edit ? openInEditor(t) : pick(t); } catch (e) { toast(e.message || 'Could not open that design.', 'err'); } };
+  const openSaved = async (id, edit, noBack) => { try { const t = await Persist.loadTemplate(id); if (!t) return; if (noBack) t.back = null; edit ? openInEditor(t) : pick(t); } catch (e) { toast(e.message || 'Could not open that design.', 'err'); } };
+  const strip = (t, noBack) => { if (noBack) t.back = null; return t; };
   // everything the popup can slide through: my designs first, then the ready-made ones under the current filter
   const items = [...list.map(t => ({ key: t.id, name: t.name, savedId: t.id })), ...shown.map(s => ({ key: s.key, name: s.name, tpl: s.tpl, make: s.make }))];
   const open = key => setView(items.findIndex(i => i.key === key));
@@ -2970,12 +3078,14 @@ function DesignView() {
           <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => pick(s.make())}>Use</button><button className="btn sm" onClick=${() => openInEditor(s.make())}>Edit</button></div></div></article>`)}</div>
     </section>
     ${view != null && items[view] ? html`<${DesignViewer} items=${items} index=${view} setIndex=${setView} onClose=${() => setView(null)}
-      onUse=${it => it.savedId ? openSaved(it.savedId) : pick(it.make())} onEdit=${it => it.savedId ? openSaved(it.savedId, true) : openInEditor(it.make())} />` : null}
+      onUse=${(it, noBack) => it.savedId ? openSaved(it.savedId, false, noBack) : pick(strip(it.make(), noBack))} onEdit=${(it, noBack) => it.savedId ? openSaved(it.savedId, true, noBack) : openInEditor(strip(it.make(), noBack))} />` : null}
   </div>`;
 }
 function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
   const it = items[index]; const n = items.length;
-  const [tpl, setTpl] = useState(it.tpl || null); const touchX = useRef(null); const boxRef = useRef();
+  const [tpl0, setTpl] = useState(it.tpl || null); const touchX = useRef(null); const boxRef = useRef();
+  const [withBack, setWithBack] = useState(true); const hadBack = tpl0 && hasBack(tpl0);
+  const tpl = tpl0 && hadBack && !withBack ? { ...tpl0, back: null } : tpl0;
   const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => { const el = boxRef.current; if (!el) return; const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight })); ro.observe(el); return () => ro.disconnect(); }, []);
   useEffect(() => {
@@ -3002,9 +3112,9 @@ function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
           : html`<${CardSides} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH} />`) : html`<span className="muted">Loading…</span>`}</div></div>
         <button className="dv-arrow r" onClick=${() => go_(1)} aria-label="Next design"><${Icon} n="right" size=${26} /></button>
       </div>
-      <div className="dv-foot"><span className="small muted dv-hint">Use the arrows${'ontouchstart' in window ? ' or swipe' : ' or ← → keys'} to see other designs</span>
-        <button className="btn" onClick=${() => onEdit(it)}><${Icon} n="edit" size=${15} />Edit</button>
-        <button className="btn primary" onClick=${() => onUse(it)}>Use this design<${Icon} n="arrowRight" /></button></div>
+      <div className="dv-foot">${hadBack ? html`<label className="switch"><input type="checkbox" checked=${withBack} onChange=${e => setWithBack(e.target.checked)} /><span className="tr" aria-hidden="true"></span>Back side</label>` : null}<span className="small muted dv-hint">Use the arrows${'ontouchstart' in window ? ' or swipe' : ' or ← → keys'} to see other designs</span>
+        <button className="btn" onClick=${() => onEdit(it, hadBack && !withBack)}><${Icon} n="edit" size=${15} />Edit</button>
+        <button className="btn primary" onClick=${() => onUse(it, hadBack && !withBack)}>Use this design<${Icon} n="arrowRight" /></button></div>
     </div></div>`;
 }
 
