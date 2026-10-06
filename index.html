@@ -298,6 +298,9 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 }
 
 /* ---- simple 3-step shell ---- */
+.shero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.shero-row .shero{flex:1 1 420px}
+.topnav{gap:8px}
 .dlgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
 .dlside{position:sticky;top:12px}
 .gallery.big{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));max-height:none}
@@ -2959,7 +2962,8 @@ function PeopleView() {
   const used = [...usedFieldKeys(tpl)]; const imgKeys = new Set(tpl.fields.filter(f => f.type === 'image').map(f => f.key));
   const unmatched = ds ? tpl.fields.filter(f => used.includes(f.key) && !imgKeys.has(f.key) && !(S().mapping[f.key] && ds.columns.includes(S().mapping[f.key]))) : [];
   return html`<div className="page spage">
-    <div className="shero"><h1>Add people</h1><p>Upload your Excel or CSV list, one person per row. Photos pasted inside the Excel file are placed on the cards automatically.</p></div>
+    <div className="shero-row"><div className="shero"><h1>Add people</h1><p>Upload your Excel or CSV list, one person per row. Photos pasted inside the Excel file are placed on the cards automatically.</p></div>
+      <div className="row nowrap topnav"><button className="btn" onClick=${() => go('templates')}><${Icon} n="left" />Back</button><button className="btn primary lg" disabled=${!ds?.rows.length} onClick=${() => go('generate')}>Next: check and download<${Icon} n="arrowRight" /></button></div></div>
     ${ds?.isExample ? html`<div className="banner"><${Icon} n="info" /><div className="grow">You're seeing <b>12 example people</b> (AI-generated faces). Upload your own list to replace them.</div></div>` : null}
     ${err ? html`<div className="banner err"><${Icon} n="alert" /><div className="grow">${err}</div></div>` : null}
     <div className="two">
@@ -3033,7 +3037,8 @@ function DownloadView() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset);
   if (!tpl || !ds) return html`<div className="page spage"><div className="panel empty"><p>${!tpl ? 'Choose a card design first.' : 'Add your list of people first.'}</p><button className="btn primary" onClick=${() => go(!tpl ? 'templates' : 'import')}>${!tpl ? 'Choose design' : 'Add people'}</button></div></div>`;
   return html`<div className="page spage">
-    <div className="shero"><h1>Check and download</h1><p>Here is every card. Click a card to see it bigger or fix it, then download them all in one file.</p></div>
+    <div className="shero-row"><div className="shero"><h1>Check and download</h1><p>Here is every card. Click a card to see it bigger or fix it, then download them all in one file.</p></div>
+      <div className="row nowrap topnav"><button className="btn" onClick=${() => go('import')}><${Icon} n="left" />Back</button></div></div>
     <div className="dlgrid"><${AllCards} /><div className="dlside"><${SimpleDownload} /></div></div>
     <${StepNav} back="import" />
   </div>`;
