@@ -536,6 +536,9 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 .shero-row .shero.big{flex:1 1 auto}
 .demo-box{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border-radius:10px;background:var(--surface-2)}
 .demo-box .grow{min-width:220px}
+.modal-body > *{flex-shrink:0}
+.changer-box{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}
+.changer-box:empty{display:none}
 </style>
 
 </head>
@@ -930,11 +933,11 @@ const Render = (() => {
     if (opts.offsetX || opts.offsetY) ctx.translate(opts.offsetX || 0, opts.offsetY || 0);
     if (opts.roundCorners && tpl.card.radius > 0) { roundRectPath(ctx, 0, 0, W, H, tpl.card.radius * s); ctx.clip(); }
     const bg = tpl.card.bg || {};
-    ctx.fillStyle = bg.color || '#FFFFFF'; ctx.fillRect(0, 0, W, H);
-    if (bg.imageId) { const im = assets.get(bg.imageId); if (im) drawFit(ctx, im, 0, 0, W, H, bg.fit || 'cover', 'center'); }
+    if (!opts.noBg) { ctx.fillStyle = bg.color || '#FFFFFF'; ctx.fillRect(0, 0, W, H);
+      if (bg.imageId) { const im = assets.get(bg.imageId); if (im) drawFit(ctx, im, 0, 0, W, H, bg.fit || 'cover', 'center'); } }
     const infos = opts.collect ? {} : null;
-    for (const el of tpl.elements) {
-      if (el.hidden) continue;
+    for (const el of (opts.noElements ? [] : tpl.elements)) {
+      if (el.hidden || (opts.only && el.id !== opts.only)) continue;
       ctx.save();
       ctx.translate((el.x + el.w / 2) * s, (el.y + el.h / 2) * s);
       if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
@@ -968,7 +971,7 @@ const Render = (() => {
     }
     return out;
   }
-  return { renderCard, textFit, resolveText, roundRectPath };
+  return { renderCard, textFit, resolveText, roundRectPath, layoutText, code128, hasLS };
 })();
 
 /* fonts: make sure faces (and fallback scripts) are loaded before drawing to canvas */
@@ -1855,6 +1858,22 @@ async function exportCards(cfg, rowsOverride) {
     const blob = await canvasToBlob(out, isJpg ? 'image/jpeg' : 'image/png', cfg.quality);
     return { blob, filename: `${fileNameFor(cfg.nameTpl, items[0], new Set())}.${isJpg ? 'jpg' : 'png'}` };
   }
+  if (cfg.format === 'zip-svg' || cfg.format === 'zip-psd') {
+    const zip = new JSZip(); const used = new Set(); const svg = cfg.format === 'zip-svg';
+    for (let n = 0; n < items.length; n++) {
+      check(); const rec = await prepareRecord(tpl, items[n]); const nm = fileNameFor(cfg.nameTpl, items[n], used);
+      const sides = twoSided ? ['front', 'back'] : ['front'];
+      for (const sd of sides) { const suffix = twoSided ? ` - ${sd}` : '';
+        if (svg) zip.file(`${nm}${suffix}.svg`, await cardToSvg(tpl, rec, sd));
+        else zip.file(`${nm}${suffix}.psd`, await cardToPsd(tpl, rec, sd, Math.min(cfg.dpi || 300, 300))); }
+      setP(n + 1, svg ? 'Making SVG files' : 'Making Photoshop files'); await yieldUI();
+    }
+    zip.file('READ ME.txt', svg ? 'Open the .svg files in Adobe Illustrator, Figma, Inkscape or CorelDRAW.\nText, shapes, barcodes and QR codes are editable vectors; photos are embedded images.\nInstall the fonts used by the design (e.g. from Google Fonts) so the text looks the same.\nSizes are in millimetres (1 file = 1 card side).\n'
+      : 'Open the .psd files in Adobe Photoshop (or Photopea, GIMP, Affinity).\nEvery element of the card is on its own named layer, above a Background layer.\nResolution: 300 dpi, actual card size.\n');
+    setP(items.length, 'Packing ZIP');
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    return { blob, filename: `${baseName}-${svg ? 'svg-illustrator' : 'psd-photoshop'}.zip` };
+  }
   if (cfg.format === 'zip-png' || cfg.format === 'zip-jpg') {
     const zip = new JSZip(); const used = new Set(); const ext = isJpg ? 'jpg' : 'png';
     for (let n = 0; n < items.length; n++) {
@@ -1942,6 +1961,97 @@ async function exportCards(cfg, rowsOverride) {
   setP(items.length, 'Writing PDF'); await yieldUI();
   const blob = pdf.output('blob');
   return { blob, filename: `${baseName}${cfg.format === 'pdf-cards' ? '-cards' : cfg.format === 'pdf-pairs' ? '-front-and-back' : '-print-sheets'}.pdf` };
+}
+
+/* ---------- Editable exports ----------
+   SVG: real vector text, shapes, gradients, barcodes and QR codes (opens editable in Illustrator, Figma, Inkscape, CorelDRAW).
+   PSD: one named layer per element, plus the background, for Photoshop. */
+const xmlEsc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const n3 = v => Math.round(v * 1000) / 1000;
+async function blobToDataUrl(b) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); }); }
+// one element drawn on its own, unrotated, at its own size (used for photos in SVG)
+async function elementPng(tpl, el, rec, dpi = 300) {
+  const s = dpi / 25.4; const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(el.w * s)); c.height = Math.max(1, Math.round(el.h * s));
+  const mini = { card: { w: el.w, h: el.h, radius: 0, bg: {} }, assets: tpl.assets, elements: [{ ...el, x: 0, y: 0, rotation: 0, flipX: false, flipY: false, opacity: 1, blend: 'normal', shadow: null }] };
+  Render.renderCard(c.getContext('2d'), mini, rec, s, { noBg: true, missingPhoto: S().settings.missingPhoto });
+  return blobToDataUrl(await canvasToBlob(c, 'image/png'));
+}
+async function cardToSvg(tpl0, rec, side) {
+  const tpl = sideView(tpl0, side); const W = tpl.card.w, H = tpl.card.h; const defs = []; const body = []; let uidn = 0; const id = p => p + (++uidn);
+  const mctx = document.createElement('canvas').getContext('2d'); const SC = 20; // measuring scale (px per mm)
+  const paint = el => {
+    if (!el.fillType || el.fillType === 'solid' || !el.fill2) return el.fill && el.fill !== 'none' ? el.fill : 'none';
+    const gid = id('g'); const c1 = el.fill && el.fill !== 'none' ? el.fill : el.fill2;
+    if (el.fillType === 'radial') defs.push(`<radialGradient id="${gid}" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${el.fill2}"/></radialGradient>`);
+    else { const a = (el.gradAngle ?? 90) * Math.PI / 180; defs.push(`<linearGradient id="${gid}" x1="${n3(0.5 - Math.cos(a) / 2)}" y1="${n3(0.5 - Math.sin(a) / 2)}" x2="${n3(0.5 + Math.cos(a) / 2)}" y2="${n3(0.5 + Math.sin(a) / 2)}"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${el.fill2}"/></linearGradient>`); }
+    return `url(#${gid})`;
+  };
+  const stroke = el => el.strokeWidth > 0 && el.stroke && el.stroke !== 'none' ? ` stroke="${el.stroke}" stroke-width="${n3(el.strokeWidth)}" stroke-linejoin="round"` : '';
+  // background
+  const bg = tpl.card.bg || {};
+  body.push(`<rect id="Background" width="${W}" height="${H}" fill="${bg.color || '#FFFFFF'}"/>`);
+  if (bg.imageId && tpl.assets[bg.imageId]) body.push(`<image id="Background_image" width="${W}" height="${H}" preserveAspectRatio="${bg.fit === 'contain' ? 'xMidYMid meet' : bg.fit === 'fill' ? 'none' : 'xMidYMid slice'}" href="${tpl.assets[bg.imageId]}"/>`);
+  for (const el of tpl.elements) {
+    if (el.hidden) continue;
+    const w = el.w, h = el.h; let attrs = `transform="translate(${n3(el.x + w / 2)} ${n3(el.y + h / 2)}) rotate(${el.rotation || 0}) scale(${el.flipX ? -1 : 1} ${el.flipY ? -1 : 1}) translate(${n3(-w / 2)} ${n3(-h / 2)})"`;
+    if ((el.opacity ?? 1) < 1) attrs += ` opacity="${n3(el.opacity)}"`;
+    if (el.blend && el.blend !== 'normal') attrs += ` style="mix-blend-mode:${el.blend}"`;
+    if (el.shadow?.on) { const sh = el.shadow, fid = id('sh'); defs.push(`<filter id="${fid}" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="${n3(sh.x ?? 0.6)}" dy="${n3(sh.y ?? 0.8)}" stdDeviation="${n3((sh.blur ?? 1.5) / 2)}" flood-color="${sh.color || '#000000'}" flood-opacity="${sh.alpha ?? 0.35}"/></filter>`); attrs += ` filter="url(#${fid})"`; }
+    const name = xmlEsc((elLabel(el) || el.type).replace(/[{}]/g, '').slice(0, 60));
+    let inner = '';
+    if (el.type === 'rect') inner = `<rect width="${n3(w)}" height="${n3(h)}" rx="${n3(Math.min(el.radius || 0, w / 2, h / 2))}" fill="${paint(el)}"${stroke(el)}/>`;
+    else if (el.type === 'ellipse') inner = `<ellipse cx="${n3(w / 2)}" cy="${n3(h / 2)}" rx="${n3(w / 2)}" ry="${n3(h / 2)}" fill="${paint(el)}"${stroke(el)}/>`;
+    else if (el.type === 'polygon') { const nS = clamp(el.sides | 0 || 5, 3, 24), pts = el.star ? nS * 2 : nS, inr = clamp(el.inner ?? 0.5, 0.1, 0.95); const P = []; for (let i = 0; i < pts; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / pts, r = el.star && i % 2 ? inr : 1; P.push(`${n3(w / 2 + Math.cos(a) * w / 2 * r)},${n3(h / 2 + Math.sin(a) * h / 2 * r)}`); } inner = `<polygon points="${P.join(' ')}" fill="${paint(el)}"${stroke(el)}/>`; }
+    else if (el.type === 'line') { const lw = Math.max(0.05, el.strokeWidth || 0.3); inner = `<line x1="0" y1="${n3(h / 2)}" x2="${n3(w)}" y2="${n3(h / 2)}" stroke="${el.stroke || '#000'}" stroke-width="${n3(lw)}"${el.dash === 'dashed' ? ` stroke-dasharray="${n3(lw * 3)} ${n3(lw * 2)}"` : el.dash === 'dotted' ? ` stroke-dasharray="0.01 ${n3(lw * 2)}" stroke-linecap="round"` : ''}/>`; }
+    else if (el.type === 'image') { inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec)}"/>`; }
+    else if (el.type === 'text') {
+      const text = Render.resolveText(el, rec); if (!text) continue;
+      const L = Render.layoutText(mctx, el, text, SC); const m = mctx.measureText('Hgय');
+      const asc = (m.fontBoundingBoxAscent ?? L.px * 0.92) / SC, desc = (m.fontBoundingBoxDescent ?? L.px * 0.24) / SC, lh = L.lh / SC, fs = L.px / SC;
+      const total = L.lines.length * lh; const y0 = el.valign === 'bottom' ? h - total : el.valign === 'top' ? 0 : (h - total) / 2;
+      const anchor = el.align === 'center' ? 'middle' : el.align === 'right' ? 'end' : 'start'; const x = el.align === 'center' ? w / 2 : el.align === 'right' ? w : 0;
+      const ls = el.letterSpacing ? ` letter-spacing="${n3(el.letterSpacing * fs)}"` : '';
+      const ol = el.outline?.width > 0 ? ` stroke="${el.outline.color || '#FFFFFF'}" stroke-width="${n3(el.outline.width * 2)}" stroke-linejoin="round" paint-order="stroke"` : '';
+      inner = `<text font-family="${xmlEsc(el.font || 'Poppins')}, sans-serif" font-size="${n3(fs)}" font-weight="${el.weight || 400}"${el.italic ? ' font-style="italic"' : ''} fill="${el.color || '#000'}" text-anchor="${anchor}"${ls}${ol} xml:space="preserve">` +
+        L.lines.map((ln, i) => `<tspan x="${n3(x)}" y="${n3(y0 + i * lh + (lh - (asc + desc)) / 2 + asc)}">${xmlEsc(ln)}</tspan>`).join('') + `</text>`;
+    } else if (el.type === 'barcode') {
+      const text = Render.resolveText({ ...el, transform: 'none' }, rec); if (!text) continue;
+      const parts = []; if (el.bg && el.bg !== 'none') parts.push(`<rect width="${n3(w)}" height="${n3(h)}" fill="${el.bg}"/>`);
+      let d = '';
+      if (el.symbology === 'qr' && window.qrcode) { const q = qrcode(0, 'M'); q.addData(unescape(encodeURIComponent(text))); q.make(); const nn = q.getModuleCount(); const size = Math.min(w, h), mm = size / nn, ox = (w - size) / 2, oy = (h - size) / 2;
+        for (let r = 0; r < nn; r++) for (let c = 0; c < nn; c++) if (q.isDark(r, c)) d += `M${n3(ox + c * mm)} ${n3(oy + r * mm)}h${n3(mm)}v${n3(mm)}h${n3(-mm)}z`; }
+      else { const wd = Render.code128(text); const tot = wd.reduce((a, b) => a + b, 0), unit = w / tot; const tmm = el.showText ? (el.textSize || 5) * PT_MM : 0; const barH = Math.max(0.5, h - (el.showText ? tmm * 1.15 : 0)); let xx = 0;
+        wd.forEach((v, i) => { if (i % 2 === 0) d += `M${n3(xx)} 0h${n3(v * unit)}v${n3(barH)}h${n3(-v * unit)}z`; xx += v * unit; });
+        if (el.showText) parts.push(`<text x="${n3(w / 2)}" y="${n3(h)}" font-family="IBM Plex Mono, monospace" font-weight="700" font-size="${n3(tmm)}" text-anchor="middle" fill="${el.color || '#000'}">${xmlEsc(text)}</text>`); }
+      parts.unshift(`<path d="${d}" fill="${el.color || '#000'}"/>`); inner = parts.join('');
+    }
+    body.push(`<g id="${name.replace(/[^A-Za-z0-9_-]+/g, '_')}_${uidn++}" ${attrs}>${inner}</g>`);
+  }
+  const r = tpl.card.radius || 0; const clip = r > 0 ? `<clipPath id="card"><rect width="${W}" height="${H}" rx="${r}"/></clipPath>` : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<defs>${clip}${defs.join('')}</defs>\n<g${r > 0 ? ' clip-path="url(#card)"' : ''}>\n${body.join('\n')}\n</g>\n</svg>\n`;
+}
+let agPsdLoading = null;
+function loadAgPsd() { if (window.agPsd) return Promise.resolve(window.agPsd); return agPsdLoading ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/ag-psd@31.0.2/dist/bundle.js'; sc.onload = () => res(window.agPsd); sc.onerror = () => { agPsdLoading = null; rej(new Error('Could not load the Photoshop exporter. Check your internet connection.')); }; document.head.appendChild(sc); }); }
+const PSD_BLEND = { normal: 'normal', multiply: 'multiply', screen: 'screen', overlay: 'overlay', darken: 'darken', lighten: 'lighten', 'color-dodge': 'color dodge', 'color-burn': 'color burn', 'hard-light': 'hard light', 'soft-light': 'soft light', difference: 'difference', luminosity: 'luminosity' };
+function trimCanvas(c) {
+  const ctx = c.getContext('2d'); const { width: w, height: h } = c; const d = ctx.getImageData(0, 0, w, h).data; let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return null; const o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1; o.getContext('2d').drawImage(c, -x0, -y0); return { canvas: o, left: x0, top: y0 };
+}
+async function cardToPsd(tpl0, rec, side, dpi) {
+  const ag = await loadAgPsd(); const tpl = sideView(tpl0, side); const s = dpi / 25.4;
+  const W = Math.round(tpl.card.w * s), H = Math.round(tpl.card.h * s); const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+  const children = []; const bgc = mk(); Render.renderCard(bgc.getContext('2d', { willReadFrequently: true }), tpl, rec, s, { noElements: true });
+  children.push({ name: 'Background', canvas: bgc, left: 0, top: 0 });
+  for (const el of tpl.elements) {
+    if (el.hidden) continue; const c = mk();
+    Render.renderCard(c.getContext('2d', { willReadFrequently: true }), { ...tpl, elements: [{ ...el, blend: 'normal', opacity: 1 }] }, rec, s, { noBg: true, missingPhoto: S().settings.missingPhoto });
+    const t = trimCanvas(c); if (!t) continue;
+    const txt = el.type === 'text' ? Render.resolveText(el, rec) : '';
+    children.push({ name: (txt ? txt.slice(0, 40) : elLabel(el)).replace(/[{}]/g, ''), canvas: t.canvas, left: t.left, top: t.top, opacity: el.opacity ?? 1, blendMode: PSD_BLEND[el.blend || 'normal'] || 'normal' });
+  }
+  const full = mk(); Render.renderCard(full.getContext('2d'), tpl, rec, s, { missingPhoto: S().settings.missingPhoto }); // flattened preview for apps that don't read layers
+  return ag.writePsd({ width: W, height: H, canvas: full, children }, { generateThumbnail: true });
 }
 let downloadsNs;
 async function saveFile(filename, blob) {
@@ -3411,6 +3521,8 @@ const SIMPLE_FORMATS = [
   ['pdf-sheet', 'PDF for double-sided printing', 'Fronts on one page, backs on the next, lined up for duplex printers'],
   ['pdf-cards', 'PDF, one card per page', 'For plastic ID card printers'],
   ['zip-png', 'Images (PNG in a ZIP)', 'One picture file per person'],
+  ['zip-svg', 'Illustrator files (SVG)', 'Editable text, shapes and codes, one file per side. Also opens in Figma, CorelDRAW'],
+  ['zip-psd', 'Photoshop files (PSD)', 'Layered: every part of the card on its own layer'],
 ];
 function DownloadView() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset);
@@ -3466,7 +3578,7 @@ function SimpleDownload() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const cfg = useS(s => s.exportCfg); const job = useS(s => s.exportJob);
   const v = useS(s => s.validation); const rev = useS(s => s.rev); const policy = useS(s => s.errorPolicy);
   const [showIssues, setShowIssues] = useState(false);
-  useEffect(() => { if (!['pdf-pairs', 'pdf-sheet', 'pdf-cards', 'zip-png'].includes(cfg.format)) Store.set(s => ({ exportCfg: { ...s.exportCfg, format: 'pdf-pairs' } })); }, []);
+  useEffect(() => { if (!['pdf-pairs', 'pdf-sheet', 'pdf-cards', 'zip-png', 'zip-svg', 'zip-psd'].includes(cfg.format)) Store.set(s => ({ exportCfg: { ...s.exportCfg, format: 'pdf-pairs' } })); }, []);
   const set = p => Store.set(s => ({ exportCfg: { ...s.exportCfg, ...p } }));
   const fresh = v && v.rev === rev && !v.running; const count = fresh ? rowsToInclude().length : ds.rows.length;
   const L = sheetLayout(cfg, tpl.card); const running = job?.status === 'running' || job?.status === 'saving';
@@ -4613,7 +4725,7 @@ function CardModal({ row, onClose }) {
   return html`<${Modal} title=${`${nm || 'Card ' + (row + 1)} · ${idx + 1} of ${items.length}`} onClose=${onClose} foot=${html`<${Fragment}><button className="btn" disabled=${idx <= 0} onClick=${() => nav(-1)}><${Icon} n="left" />Previous</button><button className="btn" disabled=${idx >= items.length - 1} onClick=${() => nav(1)}>Next<${Icon} n="right" /></button><span className="grow"></span><button className="btn" onClick=${() => Store.set({ modal: { type: 'row', row } })}><${Icon} n="edit" />Edit details</button><button className="btn primary" onClick=${() => runExport({ ...S().exportCfg, format: 'single-png' }, [row])}><${Icon} n="download" />Save PNG</button><//>`}>
     <div className="preview-box"><${CardSides} tpl=${tpl} row=${row} maxW=${hasBack(tpl) ? 680 : 460} maxH=${480} /></div>
     ${rs ? html`<div className="stack" style=${{ gap: 4 }}>${rs.list.map((x, i) => html`<div key=${i} className=${'banner ' + (x.severity === 'error' ? 'err' : 'warn')} style=${{ padding: '7px 12px' }}><${Icon} n="alert" size=${14} /><span className="grow">${x.msg}</span></div>`)}</div>` : null}
-    <${PhotoChanger} row=${row} />
+    <div className="changer-box"><${PhotoChanger} row=${row} /></div>
   <//>`;
 }
 const openDesignUpload = (replace = false) => Store.set({ modal: { type: 'design', replace } });
