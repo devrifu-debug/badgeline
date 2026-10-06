@@ -732,7 +732,7 @@ const Render = (() => {
     const w = el.w * s, h = el.h * s; const text = resolveText({ ...el, transform: 'none' }, rec);
     if (el.bg && el.bg !== 'none') { ctx.fillStyle = el.bg; ctx.fillRect(0, 0, w, h); }
     ctx.fillStyle = el.color || '#000';
-    if (!text) { ctx.globalAlpha *= 0.35; ctx.fillRect(0, h * 0.2, w, h * 0.5); return; }
+    if (!text) { if (rec.sample) { ctx.globalAlpha *= 0.35; ctx.fillRect(0, h * 0.2, w, h * 0.5); } return; }
     if (el.symbology === 'qr') {
       if (!window.qrcode) { ctx.font = `600 ${Math.min(w, h) * 0.25}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('QR', w / 2, h / 2); return; }
       const q = qrcode(0, 'M'); q.addData(unescape(encodeURIComponent(text))); q.make(); const n = q.getModuleCount();
@@ -1627,6 +1627,18 @@ function sheetLayout(cfg, card) {
   const slots = []; for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) slots.push({ x: x0 + c * (cw + cfg.gapX), y: y0 + r * (ch + cfg.gapY) });
   return { pw, ph, cw, ch, cols, rows, maxCols, maxRows, gridW, gridH, fits, x0, y0, slots, perPage: cols * rows, availW, availH };
 }
+// One block per person: front and back next to each other, name underneath. Picks the page orientation that fits most.
+function pairLayout(cfg, card, two) {
+  const gapIn = 4, cap = 7.2, gx = 10, gy = 4, mg = 5.5;
+  const bw = two ? card.w * 2 + gapIn : card.w, bh = card.h + cap;
+  let [pw, ph] = PAGE_SIZES[cfg.page] || PAGE_SIZES.A4; if (pw > ph) [pw, ph] = [ph, pw];
+  const fit = (W, H) => { const cols = Math.max(0, Math.floor((W - 2 * mg + gx) / (bw + gx))), rows = Math.max(0, Math.floor((H - 2 * mg + gy) / (bh + gy))); return { W, H, cols, rows, n: cols * rows }; };
+  const a = fit(pw, ph), b = fit(ph, pw); const best = b.n > a.n ? b : a;
+  const gridW = best.cols * bw + (best.cols - 1) * gx, gridH = best.rows * bh + (best.rows - 1) * gy;
+  const x0 = (best.W - gridW) / 2, y0 = (best.H - gridH) / 2; const slots = [];
+  for (let r = 0; r < best.rows; r++) for (let c = 0; c < best.cols; c++) slots.push({ x: x0 + c * (bw + gx), y: y0 + r * (bh + gy) });
+  return { pw: best.W, ph: best.H, cw: card.w, ch: card.h, gapIn, cap, slots, perPage: best.n, fits: best.n > 0, two };
+}
 function fileNameFor(pattern, row, used) {
   let n = sanitizeFilename(String(pattern || '').replace(TOKEN_RE, (_, k) => cellValue(row, k))) || `card-${row + 1}`;
   n = n.replace(/^[\s_\-.]+|[\s_\-.]+$/g, '') || `card-${row + 1}`;
@@ -1683,6 +1695,11 @@ async function exportCards(cfg, rowsOverride) {
   const { jsPDF } = window.jspdf;
   let pdf, L;
   if (cfg.format === 'pdf-cards') pdf = new jsPDF({ unit: 'mm', format: [tpl.card.w, tpl.card.h], orientation: tpl.card.w > tpl.card.h ? 'landscape' : 'portrait', compress: true });
+  else if (cfg.format === 'pdf-pairs') {
+    L = pairLayout(cfg, tpl.card, twoSided);
+    if (!L.fits) throw new Error('This card is too big for the page. Choose a larger page size.');
+    pdf = new jsPDF({ unit: 'mm', format: [L.pw, L.ph], orientation: L.pw > L.ph ? 'landscape' : 'portrait', compress: true });
+  }
   else {
     L = sheetLayout(cfg, tpl.card);
     if (!L.fits || L.perPage < 1) throw new Error('The cards don\'t fit on the page with these settings. Reduce rows/columns, margins or spacing.');
@@ -1705,7 +1722,23 @@ async function exportCards(cfg, rowsOverride) {
   // The back of slot (row, col) must land behind its front once the sheet is flipped: mirror the columns (long-edge flip)
   // or the rows (short-edge flip).
   const backSlot = i => { const r = Math.floor(i / L.cols), col = i % L.cols; return cfg.flip === 'short' ? (L.rows - 1 - r) * L.cols + col : r * L.cols + (L.cols - 1 - col); };
-  if (cfg.format === 'pdf-cards') {
+  if (cfg.format === 'pdf-pairs') {
+    const pageOrient = L.pw > L.ph ? 'landscape' : 'portrait';
+    const nameKey = tpl.fields.find(f => f.key === 'name') ? 'name' : tpl.fields.find(f => f.type === 'text')?.key;
+    const corner = (x, y, w, h) => { if (!cfg.cropMarks) return; pdf.setDrawColor(70, 70, 70); pdf.setLineWidth(0.15); const o = 1, l = 2.5;
+      [[x, y, -1, -1], [x + w, y, 1, -1], [x, y + h, -1, 1], [x + w, y + h, 1, 1]].forEach(([cx, cy, dx, dy]) => { pdf.line(cx + dx * o, cy, cx + dx * (o + l), cy); pdf.line(cx, cy + dy * o, cx, cy + dy * (o + l)); }); };
+    for (let n = 0; n < items.length; n++) {
+      check(); const i = n % L.perPage; if (n > 0 && i === 0) pdf.addPage([L.pw, L.ph], pageOrient);
+      const p = L.slots[i];
+      await renderRow(items[n]); pdf.addImage(c.toDataURL('image/jpeg', cfg.quality), 'JPEG', p.x, p.y, L.cw, L.ch, undefined, 'FAST'); corner(p.x, p.y, L.cw, L.ch);
+      if (L.two) { const bx = p.x + L.cw + L.gapIn; await renderRow(items[n], 'back'); pdf.addImage(c.toDataURL('image/jpeg', cfg.quality), 'JPEG', bx, p.y, L.cw, L.ch, undefined, 'FAST'); corner(bx, p.y, L.cw, L.ch); }
+      const nm = String((nameKey && cellValue(items[n], nameKey)) || ''); const label = `${items[n] + 1}. ` + (/^[\x20-\x7E]*$/.test(nm) ? nm : '');
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(90, 90, 90);
+      pdf.text(label.slice(0, 60), p.x + (L.two ? L.cw * 2 + L.gapIn : L.cw) / 2, p.y + L.ch + 6.6, { align: 'center' });
+      if (L.two) { pdf.setFontSize(6); pdf.setTextColor(150, 150, 150); pdf.text('FRONT', p.x + L.cw / 2, p.y - 1.6, { align: 'center' }); pdf.text('BACK', p.x + L.cw * 1.5 + L.gapIn, p.y - 1.6, { align: 'center' }); }
+      if (n % 3 === 2 || n === items.length - 1) { setP(n + 1, 'Rendering cards'); await yieldUI(); }
+    }
+  } else if (cfg.format === 'pdf-cards') {
     for (let n = 0; n < items.length; n++) {
       check(); await renderRow(items[n]);
       if (n > 0) pdf.addPage([tpl.card.w, tpl.card.h], cardOrient);
@@ -1730,7 +1763,7 @@ async function exportCards(cfg, rowsOverride) {
   }
   setP(items.length, 'Writing PDF'); await yieldUI();
   const blob = pdf.output('blob');
-  return { blob, filename: `${baseName}${cfg.format === 'pdf-cards' ? '-cards' : '-print-sheets'}.pdf` };
+  return { blob, filename: `${baseName}${cfg.format === 'pdf-cards' ? '-cards' : cfg.format === 'pdf-pairs' ? '-front-and-back' : '-print-sheets'}.pdf` };
 }
 let downloadsNs;
 async function saveFile(filename, blob) {
@@ -2645,7 +2678,7 @@ const STARTERS = [
 ];
 const DEFAULT_SETTINGS = { dpi: 300, quality: 0.92, snapping: true, nudge: 0.5, missingPhoto: 'placeholder', previewWithData: true };
 const defaultExportCfg = card => {
-  const cfg = { format: 'pdf-sheet', dpi: 300, quality: 0.92, page: 'A4', orient: 'portrait', pageW: 210, pageH: 297, cols: 3, rows: 3, marginX: 10, marginY: 10, gapX: 4, gapY: 4, center: true, cropMarks: true, cutLines: false, roundCorners: true, backSide: true, flip: 'long', nameTpl: '{{employee_id}} {{name}}' };
+  const cfg = { format: 'pdf-pairs', dpi: 300, quality: 0.92, page: 'A4', orient: 'portrait', pageW: 210, pageH: 297, cols: 3, rows: 3, marginX: 10, marginY: 10, gapX: 4, gapY: 4, center: true, cropMarks: true, cutLines: false, roundCorners: true, backSide: true, flip: 'long', nameTpl: '{{employee_id}} {{name}}' };
   return autoFitCfg(cfg, card);
 };
 function autoFitCfg(cfg, card) {
@@ -3155,7 +3188,8 @@ async function downloadAll() {
   } catch (e) { toast('Download failed: ' + (e.message || e), 'err'); }
 }
 const SIMPLE_FORMATS = [
-  ['pdf-sheet', 'PDF for printing', 'Several cards on each A4 page, with cut marks'],
+  ['pdf-pairs', 'PDF – each card with its back', "Every person's front and back side by side, with their name and cut marks"],
+  ['pdf-sheet', 'PDF for double-sided printing', 'Fronts on one page, backs on the next, lined up for duplex printers'],
   ['pdf-cards', 'PDF, one card per page', 'For plastic ID card printers'],
   ['zip-png', 'Images (PNG in a ZIP)', 'One picture file per person'],
 ];
@@ -3213,7 +3247,7 @@ function SimpleDownload() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const cfg = useS(s => s.exportCfg); const job = useS(s => s.exportJob);
   const v = useS(s => s.validation); const rev = useS(s => s.rev); const policy = useS(s => s.errorPolicy);
   const [showIssues, setShowIssues] = useState(false);
-  useEffect(() => { if (!['pdf-sheet', 'pdf-cards', 'zip-png'].includes(cfg.format)) Store.set(s => ({ exportCfg: { ...s.exportCfg, format: 'pdf-sheet' } })); }, []);
+  useEffect(() => { if (!['pdf-pairs', 'pdf-sheet', 'pdf-cards', 'zip-png'].includes(cfg.format)) Store.set(s => ({ exportCfg: { ...s.exportCfg, format: 'pdf-pairs' } })); }, []);
   const set = p => Store.set(s => ({ exportCfg: { ...s.exportCfg, ...p } }));
   const fresh = v && v.rev === rev && !v.running; const count = fresh ? rowsToInclude().length : ds.rows.length;
   const L = sheetLayout(cfg, tpl.card); const running = job?.status === 'running' || job?.status === 'saving';
@@ -3226,7 +3260,7 @@ function SimpleDownload() {
             <${Check} checked=${policy === 'include'} onChange=${on => { Store.set({ errorPolicy: on ? 'include' : 'skip' }); }}>Include them anyway</${Check}></div></div></div>
           ${showIssues ? html`<div className="issues sm">${errList.slice(0, 200).map((x, i) => html`<div key=${i} className="issue error"><span className="ln">${(cellValue(x.row, 'name') || 'Row ' + (x.row + 1)).slice(0, 22)}</span><span className="grow">${x.msg}</span><button className="btn sm" onClick=${() => Store.set({ previewRow: x.row, modal: { type: 'row', row: x.row } })}>Fix</button></div>`)}</div>` : null}`
         : html`<div className="loaded ok"><${Icon} n="check" size=${20} /><div className="grow"><b>All ${plural(ds.rows.length, 'card')}</b> look good</div></div>`}
-      <div className="fmts" role="radiogroup" aria-label="File type">${SIMPLE_FORMATS.map(([k, l, d]) => html`<label key=${k} className=${'fmt' + (cfg.format === k ? ' on' : '')}><input type="radio" name="fmt" checked=${cfg.format === k} onChange=${() => set({ format: k })} /><span><b>${l}</b><span className="small muted">${d}</span></span></label>`)}</div>
+      <div className="fmts" role="radiogroup" aria-label="File type">${SIMPLE_FORMATS.map(([k, l, d]) => (hasBack(tpl) && cfg.backSide !== false) ? [k, l, d] : k === 'pdf-pairs' ? [k, 'PDF – each card separately', "Every person's card with their name and cut marks"] : k === 'pdf-sheet' ? [k, 'PDF – cards packed on pages', 'As many cards on each page as fit, for cutting'] : [k, l, d]).map(([k, l, d]) => html`<label key=${k} className=${'fmt' + (cfg.format === k ? ' on' : '')}><input type="radio" name="fmt" checked=${cfg.format === k} onChange=${() => set({ format: k })} /><span><b>${l}</b><span className="small muted">${d}</span></span></label>`)}</div>
       ${hasBack(tpl) ? html`<${Check} checked=${cfg.backSide !== false} onChange=${on => set({ backSide: on })}>Include the back side</${Check}>` : null}
       <button className="btn primary lg dlbtn" disabled=${running || !fresh || !count || (cfg.format === 'pdf-sheet' && !L.fits)} onClick=${downloadAll}><${Icon} n="download" size=${20} />${running ? 'Preparing…' : `Download ${plural(count, 'card')}`}</button>
       ${running ? html`<div className="stack"><${Progress} value=${job.total ? job.done / job.total : 1} /><span className="small muted num">${job.label}${job.total ? ` · ${job.done}/${job.total}` : ''}</span></div>` : null}
