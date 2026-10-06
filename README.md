@@ -8,7 +8,7 @@ Make ID cards in bulk from a spreadsheet, right in the browser.
 
 1. **Choose design**: 27 ready-made designs (portrait, landscape, front & back, Bangla school ID and more), or upload your own design (PNG, JPG, SVG or PDF from Canva or Figma) and edit it.
 2. **Add people**: upload your Excel (.xlsx) or CSV list. Pictures pasted into the Excel cells are detected and placed on each person's card automatically.
-3. **Download**: check each card, then download a print-ready A4 PDF (each card with its back, or duplex sheets), a PDF with one card per page for card printers, PNG images, **editable SVG files for Illustrator / Figma / CorelDRAW**, or **layered PSD files for Photoshop**.
+3. **Download**: check each card, then download a print-ready A4 PDF (each card with its back, or duplex sheets), a PDF with one card per page for card printers, PNG images, **SVG files for Illustrator / Figma / CorelDRAW**, or **layered PSD files for Photoshop**. In every download the text is locked (drawn as a picture), so names, IDs and dates cannot be retyped.
 
 Columns are matched to card fields automatically, and missing photos or information are flagged before you download.
 

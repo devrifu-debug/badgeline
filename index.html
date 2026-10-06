@@ -1826,6 +1826,13 @@ function fileNameFor(pattern, row, used) {
   let out = n, i = 2; while (used.has(out.toLowerCase())) out = `${n} (${i++})`; used.add(out.toLowerCase()); return out;
 }
 let exportToken = 0;
+const labelCache = new Map();
+function labelImage(text, pt, color) {
+  const k = text + '|' + pt + '|' + color; if (labelCache.has(k)) return labelCache.get(k);
+  const px = pt * 600 / 72; const c = document.createElement('canvas'); const x = c.getContext('2d'); const f = `500 ${px}px Inter, Arial, sans-serif`; x.font = f;
+  c.width = Math.max(1, Math.ceil(x.measureText(text).width + px * 0.2)); c.height = Math.ceil(px * 1.4); x.font = f; x.fillStyle = color; x.textBaseline = 'alphabetic'; x.fillText(text, px * 0.1, px * 1.1);
+  const r = { url: c.toDataURL('image/png'), ratio: c.width / c.height }; if (labelCache.size > 500) labelCache.clear(); labelCache.set(k, r); return r;
+}
 async function exportCards(cfg, rowsOverride) {
   const token = ++exportToken;
   const st = S(); const tpl = st.template;
@@ -1868,8 +1875,8 @@ async function exportCards(cfg, rowsOverride) {
         else zip.file(`${nm}${suffix}.psd`, await cardToPsd(tpl, rec, sd, Math.min(cfg.dpi || 300, 300))); }
       setP(n + 1, svg ? 'Making SVG files' : 'Making Photoshop files'); await yieldUI();
     }
-    zip.file('READ ME.txt', svg ? 'Open the .svg files in Adobe Illustrator, Figma, Inkscape or CorelDRAW.\nText, shapes, barcodes and QR codes are editable vectors; photos are embedded images.\nInstall the fonts used by the design (e.g. from Google Fonts) so the text looks the same.\nSizes are in millimetres (1 file = 1 card side).\n'
-      : 'Open the .psd files in Adobe Photoshop (or Photopea, GIMP, Affinity).\nEvery element of the card is on its own named layer, above a Background layer.\nResolution: 300 dpi, actual card size.\n');
+    zip.file('READ ME.txt', svg ? 'Open the .svg files in Adobe Illustrator, Figma, Inkscape or CorelDRAW.\nShapes, colours and QR codes are vectors you can move and recolour. All text (names, IDs, dates, labels) is locked as a 600 dpi picture so it cannot be retyped.\nSizes are in millimetres (1 file = 1 card side).\n'
+      : 'Open the .psd files in Adobe Photoshop (or Photopea, GIMP, Affinity).\nEvery element of the card is on its own named layer, above a Background layer. Text layers are pixels, so the wording cannot be retyped.\nResolution: 300 dpi, actual card size.\n');
     setP(items.length, 'Packing ZIP');
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
     return { blob, filename: `${baseName}-${svg ? 'svg-illustrator' : 'psd-photoshop'}.zip` };
@@ -1930,9 +1937,10 @@ async function exportCards(cfg, rowsOverride) {
       await renderRow(items[n]); pdf.addImage(c.toDataURL('image/jpeg', cfg.quality), 'JPEG', p.x, p.y, L.cw, L.ch, undefined, 'FAST'); corner(p.x, p.y, L.cw, L.ch);
       if (L.two) { const bx = p.x + L.cw + L.gapIn; await renderRow(items[n], 'back'); pdf.addImage(c.toDataURL('image/jpeg', cfg.quality), 'JPEG', bx, p.y, L.cw, L.ch, undefined, 'FAST'); corner(bx, p.y, L.cw, L.ch); }
       const nm = String((nameKey && cellValue(items[n], nameKey)) || ''); const label = `${items[n] + 1}. ` + (/^[\x20-\x7E]*$/.test(nm) ? nm : '');
-      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(90, 90, 90);
-      pdf.text(label.slice(0, 60), p.x + (L.two ? L.cw * 2 + L.gapIn : L.cw) / 2, p.y + L.ch + 6.6, { align: 'center' });
-      if (L.two) { pdf.setFontSize(6); pdf.setTextColor(150, 150, 150); pdf.text('FRONT', p.x + L.cw / 2, p.y - 1.6, { align: 'center' }); pdf.text('BACK', p.x + L.cw * 1.5 + L.gapIn, p.y - 1.6, { align: 'center' }); }
+      // labels are drawn as small pictures, so the PDF holds no editable text at all
+      const lab = (t, pt, col, cx, baseY) => { const im = labelImage(t, pt, col); const hmm = pt * PT_MM * 1.4, wmm = hmm * im.ratio; pdf.addImage(im.url, 'PNG', cx - wmm / 2, baseY - hmm * 0.8, wmm, hmm, undefined, 'FAST'); };
+      lab(label.slice(0, 60), 8, '#5A5A5A', p.x + (L.two ? L.cw * 2 + L.gapIn : L.cw) / 2, p.y + L.ch + 6.6);
+      if (L.two) { lab('FRONT', 6, '#969696', p.x + L.cw / 2, p.y - 1.6); lab('BACK', 6, '#969696', p.x + L.cw * 1.5 + L.gapIn, p.y - 1.6); }
       if (n % 3 === 2 || n === items.length - 1) { setP(n + 1, 'Rendering cards'); await yieldUI(); }
     }
   } else if (cfg.format === 'pdf-cards') {
@@ -2005,15 +2013,12 @@ async function cardToSvg(tpl0, rec, side) {
     else if (el.type === 'line') { const lw = Math.max(0.05, el.strokeWidth || 0.3); inner = `<line x1="0" y1="${n3(h / 2)}" x2="${n3(w)}" y2="${n3(h / 2)}" stroke="${el.stroke || '#000'}" stroke-width="${n3(lw)}"${el.dash === 'dashed' ? ` stroke-dasharray="${n3(lw * 3)} ${n3(lw * 2)}"` : el.dash === 'dotted' ? ` stroke-dasharray="0.01 ${n3(lw * 2)}" stroke-linecap="round"` : ''}/>`; }
     else if (el.type === 'image') { inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec)}"/>`; }
     else if (el.type === 'text') {
-      const text = Render.resolveText(el, rec); if (!text) continue;
-      const L = Render.layoutText(mctx, el, text, SC); const m = mctx.measureText('Hgय');
-      const asc = (m.fontBoundingBoxAscent ?? L.px * 0.92) / SC, desc = (m.fontBoundingBoxDescent ?? L.px * 0.24) / SC, lh = L.lh / SC, fs = L.px / SC;
-      const total = L.lines.length * lh; const y0 = el.valign === 'bottom' ? h - total : el.valign === 'top' ? 0 : (h - total) / 2;
-      const anchor = el.align === 'center' ? 'middle' : el.align === 'right' ? 'end' : 'start'; const x = el.align === 'center' ? w / 2 : el.align === 'right' ? w : 0;
-      const ls = el.letterSpacing ? ` letter-spacing="${n3(el.letterSpacing * fs)}"` : '';
-      const ol = el.outline?.width > 0 ? ` stroke="${el.outline.color || '#FFFFFF'}" stroke-width="${n3(el.outline.width * 2)}" stroke-linejoin="round" paint-order="stroke"` : '';
-      inner = `<text font-family="${xmlEsc(el.font || 'Poppins')}, sans-serif" font-size="${n3(fs)}" font-weight="${el.weight || 400}"${el.italic ? ' font-style="italic"' : ''} fill="${el.color || '#000'}" text-anchor="${anchor}"${ls}${ol} xml:space="preserve">` +
-        L.lines.map((ln, i) => `<tspan x="${n3(x)}" y="${n3(y0 + i * lh + (lh - (asc + desc)) / 2 + asc)}">${xmlEsc(ln)}</tspan>`).join('') + `</text>`;
+      // Text is flattened to a 600 dpi picture so names, IDs and dates can't be retyped in Illustrator.
+      if (!Render.resolveText(el, rec)) continue;
+      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec, 600)}"/>`;
+    } else if (el.type === 'barcode' && el.showText && el.symbology !== 'qr') {
+      if (!Render.resolveText({ ...el, transform: 'none' }, rec)) continue;
+      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec, 600)}"/>`;
     } else if (el.type === 'barcode') {
       const text = Render.resolveText({ ...el, transform: 'none' }, rec); if (!text) continue;
       const parts = []; if (el.bg && el.bg !== 'none') parts.push(`<rect width="${n3(w)}" height="${n3(h)}" fill="${el.bg}"/>`);
@@ -3521,8 +3526,8 @@ const SIMPLE_FORMATS = [
   ['pdf-sheet', 'PDF for double-sided printing', 'Fronts on one page, backs on the next, lined up for duplex printers'],
   ['pdf-cards', 'PDF, one card per page', 'For plastic ID card printers'],
   ['zip-png', 'Images (PNG in a ZIP)', 'One picture file per person'],
-  ['zip-svg', 'Illustrator files (SVG)', 'Editable text, shapes and codes, one file per side. Also opens in Figma, CorelDRAW'],
-  ['zip-psd', 'Photoshop files (PSD)', 'Layered: every part of the card on its own layer'],
+  ['zip-svg', 'Illustrator files (SVG)', 'Layers and shapes you can move; text is locked and cannot be retyped'],
+  ['zip-psd', 'Photoshop files (PSD)', 'Every part on its own layer; text is locked and cannot be retyped'],
 ];
 function DownloadView() {
   const tpl = useS(s => s.template); const ds = useS(s => s.dataset);
