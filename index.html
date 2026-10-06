@@ -519,6 +519,17 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 @media (max-width:600px){ .shero h1{font-size:26px;letter-spacing:-.6px} .spage{padding-top:24px} .shead{padding:0 12px} .sstep{padding:0 12px 0 6px} }
 .shero.big h1{font-size:52px;line-height:1.05;letter-spacing:-2px}
 @media (max-width:600px){.shero.big h1{font-size:34px;letter-spacing:-1px}}
+
+/* pro editing */
+.selframe.multi{outline:1.5px solid var(--sel);outline-offset:0}
+.selunion{position:absolute;outline:1px dashed var(--sel);pointer-events:none}
+.marquee{position:absolute;border:1px solid var(--sel);background:color-mix(in srgb,var(--sel) 12%,transparent);pointer-events:none}
+.slider{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.slider span{display:flex;justify-content:space-between}
+.slider b{color:var(--fg);font-weight:600}
+.slider input{width:100%;accent-color:var(--fg)}
+.layer.sel{background:var(--accent-soft)}
+.grid-sel{border:0;background:none;font:inherit;font-size:12px;color:var(--muted);cursor:pointer;padding:0 2px}
 </style>
 
 </head>
@@ -650,6 +661,7 @@ function makeEl(type, card, o = {}) {
   if (type === 'image') Object.assign(el, { w: 22, h: 27, field: null, imageId: null, fit: 'cover', focus: 'center', shape: 'rect', radius: 1.5, stroke: '#FFFFFF', strokeWidth: 0, missing: 'placeholder' });
   if (type === 'rect') Object.assign(el, { w: 24, h: 14, fill: '#0F6B5C', stroke: '#0B3D35', strokeWidth: 0, radius: 0 });
   if (type === 'ellipse') Object.assign(el, { w: 16, h: 16, fill: '#E2A93B', stroke: '#14201D', strokeWidth: 0 });
+  if (type === 'polygon') Object.assign(el, { w: 16, h: 16, fill: '#E2A93B', stroke: '#14201D', strokeWidth: 0, sides: 6, star: false, inner: 0.5 });
   if (type === 'line') Object.assign(el, { w: 30, h: 2, stroke: '#14201D', strokeWidth: 0.4, dash: 'solid' });
   if (type === 'barcode') Object.assign(el, { w: 30, h: 7, text: '{{employee_id}}', symbology: 'code128', color: '#000000', bg: 'none', showText: true, textSize: 5 });
   Object.assign(el, o);
@@ -699,6 +711,7 @@ function elLabel(el) {
   if (el.type === 'text') return (el.text || 'Text').replace(/\s+/g, ' ').slice(0, 28) || 'Text';
   if (el.type === 'image') return el.field ? `Photo · {{${el.field}}}` : 'Image';
   if (el.type === 'barcode') return (el.symbology === 'qr' ? 'QR code' : 'Barcode') + (el.text ? ' · ' + el.text : '');
+  if (el.type === 'polygon') return el.star ? 'Star' : el.sides === 3 ? 'Triangle' : 'Polygon';
   return { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' }[el.type] || el.type;
 }
 
@@ -710,6 +723,38 @@ const Render = (() => {
     r = Math.max(0, Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2));
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function polygonPath(ctx, w, h, el) {
+    const n = clamp(el.sides | 0 || 5, 3, 24), star = !!el.star, inner = clamp(el.inner ?? 0.5, 0.1, 0.95);
+    const pts = star ? n * 2 : n; ctx.beginPath();
+    for (let i = 0; i < pts; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / pts; const r = star && i % 2 ? inner : 1; const x = w / 2 + Math.cos(a) * w / 2 * r, y = h / 2 + Math.sin(a) * h / 2 * r; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.closePath();
+  }
+  // Solid colour or a linear / radial gradient between fill and fill2.
+  function paintFor(ctx, el, w, h) {
+    if (!el.fillType || el.fillType === 'solid' || !el.fill2) return el.fill;
+    let g;
+    if (el.fillType === 'radial') g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) / 2);
+    else { const a = (el.gradAngle ?? 90) * Math.PI / 180, dx = Math.cos(a) * w / 2, dy = Math.sin(a) * h / 2; g = ctx.createLinearGradient(w / 2 - dx, h / 2 - dy, w / 2 + dx, h / 2 + dy); }
+    g.addColorStop(0, el.fill && el.fill !== 'none' ? el.fill : 'rgba(0,0,0,0)'); g.addColorStop(1, el.fill2); return g;
+  }
+  const hexA = (hex, a) => { const h = toHex6(hex); const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
+  function applyShadow(ctx, el, s) {
+    const sh = el.shadow; if (!sh || !sh.on) return false;
+    ctx.shadowColor = hexA(sh.color || '#000000', sh.alpha ?? 0.35); ctx.shadowBlur = Math.max(0, (sh.blur ?? 1.5) * s);
+    ctx.shadowOffsetX = (sh.x ?? 0.6) * s; ctx.shadowOffsetY = (sh.y ?? 0.8) * s; return true;
+  }
+  const noShadow = ctx => { ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; };
+  function imgFilter(el) {
+    const a = el.adj; if (!a) return 'none'; const f = [];
+    if (a.brightness != null && a.brightness !== 100) f.push(`brightness(${a.brightness}%)`);
+    if (a.contrast != null && a.contrast !== 100) f.push(`contrast(${a.contrast}%)`);
+    if (a.saturate != null && a.saturate !== 100) f.push(`saturate(${a.saturate}%)`);
+    if (a.hue) f.push(`hue-rotate(${a.hue}deg)`);
+    if (a.gray) f.push('grayscale(100%)');
+    if (a.sepia) f.push('sepia(80%)');
+    if (a.blur) f.push(`blur(${a.blur}px)`);
+    return f.length ? f.join(' ') : 'none';
   }
   function ellipsePath(ctx, x, y, w, h) { ctx.beginPath(); ctx.ellipse(x + w / 2, y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2); ctx.closePath(); }
   const hasLS = (() => { try { return 'letterSpacing' in document.createElement('canvas').getContext('2d'); } catch { return false; } })();
@@ -796,7 +841,9 @@ const Render = (() => {
     const x = ctx.textAlign === 'center' ? L.boxW / 2 + lsShift : ctx.textAlign === 'right' ? L.boxW + lsShift * 2 : 0;
     const clip = el.overflow !== 'wrap';
     if (clip) { ctx.save(); ctx.beginPath(); ctx.rect(-2, -2, L.boxW + 4, L.boxH + 4); ctx.clip(); }
-    L.lines.forEach((ln, i) => { const top = y0 + i * L.lh; ctx.fillText(ln, x, top + (L.lh - (asc + desc)) / 2 + asc); });
+    const ys = L.lines.map((_, i) => y0 + i * L.lh + (L.lh - (asc + desc)) / 2 + asc);
+    if (el.outline?.width > 0) { ctx.save(); ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.lineWidth = el.outline.width * s * 2; ctx.strokeStyle = el.outline.color || '#FFFFFF'; L.lines.forEach((ln, i) => ctx.strokeText(ln, x, ys[i])); ctx.restore(); noShadow(ctx); }
+    L.lines.forEach((ln, i) => ctx.fillText(ln, x, ys[i]));
     if (clip) ctx.restore();
     if (hasLS) ctx.letterSpacing = '0px';
   }
@@ -820,8 +867,10 @@ const Render = (() => {
     if (el.field) img = rec.image(el.field); else if (el.imageId) img = assets.get(el.imageId);
     if (info) info.image = !!img;
     const path = () => el.shape === 'circle' ? ellipsePath(ctx, 0, 0, w, h) : roundRectPath(ctx, 0, 0, w, h, (el.radius || 0) * s);
+    if (el.shadow?.on) { const sh = el.shadow; ctx.save(); noShadow(ctx); ctx.translate((sh.x ?? 0.6) * s, (sh.y ?? 0.8) * s); if ((sh.blur ?? 1.5) > 0) ctx.filter = `blur(${((sh.blur ?? 1.5) * s / 2).toFixed(1)}px)`; ctx.fillStyle = hexA(sh.color || '#000000', sh.alpha ?? 0.35); path(); ctx.fill(); ctx.restore(); }
+    noShadow(ctx);
     ctx.save(); path(); ctx.clip();
-    if (img) drawFit(ctx, img, 0, 0, w, h, el.fit || 'cover', el.focus || 'center');
+    if (img) { const f = imgFilter(el); if (f !== 'none') ctx.filter = f; drawFit(ctx, img, 0, 0, w, h, el.fit || 'cover', el.focus || 'center'); ctx.filter = 'none'; }
     else if (opts.missingPhoto !== 'blank' && el.missing !== 'empty') drawPlaceholder(ctx, w, h, opts.markMissing && !!el.field);
     else if (el.missing === 'empty' && opts.editor) { ctx.strokeStyle = 'rgba(26,115,232,.5)'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, w - 1, h - 1); ctx.setLineDash([]); }
     ctx.restore();
@@ -836,9 +885,10 @@ const Render = (() => {
       else if (el.dash === 'dotted') { ctx.setLineDash([0.01, lw * 2]); ctx.lineCap = 'round'; }
       ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'butt'; return;
     }
-    if (el.type === 'ellipse') ellipsePath(ctx, 0, 0, w, h); else roundRectPath(ctx, 0, 0, w, h, (el.radius || 0) * s);
-    if (el.fill && el.fill !== 'none') { ctx.fillStyle = el.fill; ctx.fill(); }
-    if (el.strokeWidth > 0 && el.stroke && el.stroke !== 'none') { ctx.lineWidth = el.strokeWidth * s; ctx.strokeStyle = el.stroke; ctx.stroke(); }
+    if (el.type === 'ellipse') ellipsePath(ctx, 0, 0, w, h); else if (el.type === 'polygon') polygonPath(ctx, w, h, el); else roundRectPath(ctx, 0, 0, w, h, (el.radius || 0) * s);
+    const hasFill = (el.fill && el.fill !== 'none') || (el.fillType && el.fillType !== 'solid' && el.fill2);
+    if (hasFill) { ctx.fillStyle = paintFor(ctx, el, w, h); ctx.fill(); if (el.strokeWidth > 0) noShadow(ctx); }
+    if (el.strokeWidth > 0 && el.stroke && el.stroke !== 'none') { ctx.lineJoin = 'round'; ctx.lineWidth = el.strokeWidth * s; ctx.strokeStyle = el.stroke; ctx.stroke(); }
   }
   // Code 128 (set B) — the barcode most ID card printers and scanners read.
   const C128 = '212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112'.split(' ');
@@ -882,8 +932,11 @@ const Render = (() => {
       ctx.save();
       ctx.translate((el.x + el.w / 2) * s, (el.y + el.h / 2) * s);
       if (el.rotation) ctx.rotate(el.rotation * Math.PI / 180);
+      if (el.flipX || el.flipY) ctx.scale(el.flipX ? -1 : 1, el.flipY ? -1 : 1);
       ctx.globalAlpha = el.opacity ?? 1;
+      if (el.blend && el.blend !== 'normal') ctx.globalCompositeOperation = el.blend;
       ctx.translate(-el.w * s / 2, -el.h * s / 2);
+      if (el.type !== 'image') applyShadow(ctx, el, s);
       const info = infos ? (infos[el.id] = {}) : null;
       try {
         if (el.type === 'text') drawText(ctx, el, rec, s, info);
@@ -2822,7 +2875,10 @@ const ICONS = {
   text: 'M5 7V4h14v3M12 4v16M9 20h6',
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15 10h.01',
   photo: 'M4 3h16v18H4zM12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 19c.8-2.6 2.6-4 5-4s4.2 1.4 5 4',
-  square: 'M4 4h16v16H4z', circle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', line: 'M4 20 20 4',
+  square: 'M4 4h16v16H4z', shapes: 'M3 13h8v8H3zM17 3l4.5 8h-9zM17 21a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', triangle: 'M12 4 21 20H3z',
+  star: 'M12 3l2.6 5.6 6.1.6-4.6 4.1 1.4 6L12 16.1 6.5 19.3l1.4-6L3.3 9.2l6.1-.6z', grid: 'M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18',
+  flipH: 'M12 3v18M9 7 3 12l6 5zM15 7l6 5-6 5z', flipV: 'M3 12h18M7 9l5-6 5 6zM7 15l5 6 5-6z', distH: 'M4 4v16M20 4v16M10 7h4v10h-4z', distV: 'M4 4h16M4 20h16M7 10v4h10v-4z',
+  dropper: 'M15 4l5 5-2 2-1-1-7 7H7v-3l7-7-1-1zM3 21l4-4', circle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', line: 'M4 20 20 4',
   undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3', redo: 'M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3',
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14', copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   toTop: 'M5 4h14M12 20V8M7 13l5-5 5 5', toBottom: 'M5 20h14M12 4v12M7 11l5 5 5-5', up: 'M12 19V5M6 11l6-6 6 6', down: 'M12 5v14M18 13l-6 6-6-6',
@@ -2861,6 +2917,7 @@ function ColorIn({ value, onChange, allowNone, id, label }) {
   return html`<div className="color-inp">
     <input type="color" value=${toHex6(value)} aria-label=${(label || 'Colour') + ' picker'} onChange=${e => onChange(e.target.value.toUpperCase())} />
     <input id=${id} type="text" aria-label=${label || 'Colour'} value=${none ? 'None' : t} onFocus=${e => e.target.select()} onChange=${e => { setT(e.target.value); if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(e.target.value)) onChange(e.target.value.toUpperCase()); }} />
+    ${window.EyeDropper ? html`<button type="button" className="icon-btn sm" title="Pick a colour from anywhere on screen" aria-label="Eyedropper" onClick=${() => new window.EyeDropper().open().then(r => onChange(r.sRGBHex.toUpperCase())).catch(() => {})}><${Icon} n="dropper" size=${13} /></button>` : null}
     ${allowNone ? html`<button type="button" className="icon-btn sm" title=${none ? 'Add colour' : 'No colour'} onClick=${() => onChange(none ? '#0F6B5C' : 'none')}><${Icon} n=${none ? 'plus' : 'x'} size=${13} /></button>` : null}
   </div>`;
 }
@@ -2998,7 +3055,49 @@ function edEnd() {
 }
 function edUndo() { const ed = S().editor; if (!ed?.past.length) return; const prev = ed.past[ed.past.length - 1]; Store.set({ editor: { ...ed, draft: prev, past: ed.past.slice(0, -1), future: [ed.draft, ...ed.future], dirty: true, selectedId: prev.elements.some(e => e.id === ed.selectedId) ? ed.selectedId : null } }); syncWorkflow(prev); lastCommit = { key: null }; }
 function edRedo() { const ed = S().editor; if (!ed?.future.length) return; const nx = ed.future[0]; Store.set({ editor: { ...ed, draft: nx, past: [...ed.past, ed.draft], future: ed.future.slice(1), dirty: true, selectedId: nx.elements.some(e => e.id === ed.selectedId) ? ed.selectedId : null } }); syncWorkflow(nx); lastCommit = { key: null }; }
-const edSelect = id => edPatch({ selectedId: id });
+const edSelect = id => edPatch({ selectedId: id, multi: null });
+// Several elements can be selected at once (Shift-click or drag a box). selList() is the current selection in layer order.
+function selList() { const ed = S().editor; if (!ed) return []; const ids = ed.multi?.length ? ed.multi : ed.selectedId ? [ed.selectedId] : []; const have = new Set(ed.draft.elements.map(e => e.id)); return ids.filter(i => have.has(i)); }
+function setSel(ids) { ids = [...new Set(ids)]; edPatch({ selectedId: ids[ids.length - 1] || null, multi: ids.length > 1 ? ids : null }); }
+function toggleSel(id) { const cur = selList(); setSel(cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]); }
+let edClipboard = null, styleClipboard = null;
+const STYLE_KEYS = { any: ['opacity', 'blend', 'shadow'], text: ['font', 'size', 'weight', 'italic', 'color', 'align', 'valign', 'letterSpacing', 'lineHeight', 'transform', 'outline'], shape: ['fill', 'fill2', 'fillType', 'gradAngle', 'stroke', 'strokeWidth', 'radius'], image: ['shape', 'radius', 'stroke', 'strokeWidth', 'adj'], line: ['stroke', 'strokeWidth', 'dash'], barcode: ['color', 'bg'] };
+const styleGroup = el => ['rect', 'ellipse', 'polygon'].includes(el.type) ? 'shape' : el.type;
+function copySel() { const ids = selList(); if (!ids.length) return; const els = S().editor.draft.elements.filter(e => ids.includes(e.id)); edClipboard = JSON.parse(JSON.stringify(els)); toast(`Copied ${plural(els.length, 'element')}`); }
+function pasteClip() {
+  if (!edClipboard?.length) return; const newIds = [];
+  edCommit(t => { for (const src of edClipboard) { const c = { ...JSON.parse(JSON.stringify(src)), id: uid('el_'), x: r2(src.x + 2), y: r2(src.y + 2) }; t.elements.push(c); newIds.push(c.id); } });
+  edClipboard = edClipboard.map(e => ({ ...e, x: r2(e.x + 2), y: r2(e.y + 2) })); setSel(newIds);
+}
+function dupSel() { const ids = selList(); if (ids.length < 2) { if (ids[0]) dupEl(ids[0]); return; } const newIds = []; edCommit(t => { for (const id of ids) { const src = t.elements.find(e => e.id === id); const c = { ...JSON.parse(JSON.stringify(src)), id: uid('el_'), x: r2(src.x + 2), y: r2(src.y + 2) }; t.elements.push(c); newIds.push(c.id); } }); setSel(newIds); }
+function delSel() { const ids = selList(); if (!ids.length) return; edCommit(t => { t.elements = t.elements.filter(e => !ids.includes(e.id)); }); setSel([]); }
+function copyStyle() { const el = S().editor.draft.elements.find(e => e.id === S().editor.selectedId); if (!el) return; const g = styleGroup(el); const st = { _group: g }; [...STYLE_KEYS.any, ...(STYLE_KEYS[g] || [])].forEach(k => { if (el[k] !== undefined) st[k] = JSON.parse(JSON.stringify(el[k])); }); styleClipboard = st; toast('Style copied. Select other elements and press Paste style (Ctrl+Shift+V).'); }
+function pasteStyle() {
+  const st = styleClipboard; const ids = selList(); if (!st || !ids.length) return;
+  edCommit(t => { for (const id of ids) { const el = t.elements.find(e => e.id === id); if (!el || el.locked) continue; const keys = styleGroup(el) === st._group ? Object.keys(st).filter(k => k !== '_group') : STYLE_KEYS.any; keys.forEach(k => { if (st[k] !== undefined) el[k] = JSON.parse(JSON.stringify(st[k])); }); } });
+  toast('Style pasted');
+}
+const bboxOf = els => { const x = Math.min(...els.map(e => e.x)), y = Math.min(...els.map(e => e.y)); return { x, y, w: Math.max(...els.map(e => e.x + e.w)) - x, h: Math.max(...els.map(e => e.y + e.h)) - y }; };
+// Align to the card when one element is selected, to the selection box when several are.
+function alignSel(mode) {
+  const ids = selList(); if (!ids.length) return; const d = S().editor.draft;
+  const els = d.elements.filter(e => ids.includes(e.id)); const ref = els.length > 1 ? bboxOf(els) : { x: 0, y: 0, w: d.card.w, h: d.card.h };
+  edCommit(t => { for (const e of t.elements) { if (!ids.includes(e.id) || e.locked) continue;
+    if (mode === 'left') e.x = r2(ref.x); if (mode === 'hcenter') e.x = r2(ref.x + ref.w / 2 - e.w / 2); if (mode === 'right') e.x = r2(ref.x + ref.w - e.w);
+    if (mode === 'top') e.y = r2(ref.y); if (mode === 'vcenter') e.y = r2(ref.y + ref.h / 2 - e.h / 2); if (mode === 'bottom') e.y = r2(ref.y + ref.h - e.h); } });
+}
+function distributeSel(axis) {
+  const ids = selList(); if (ids.length < 3) { toast('Select at least 3 elements to distribute them evenly.', 'err'); return; }
+  const P = axis === 'h' ? 'x' : 'y', Z = axis === 'h' ? 'w' : 'h';
+  edCommit(t => { const els = t.elements.filter(e => ids.includes(e.id)).sort((a, b) => a[P] - b[P]);
+    const start = els[0][P], end = Math.max(...els.map(e => e[P] + e[Z])); const gap = (end - start - els.reduce((n, e) => n + e[Z], 0)) / (els.length - 1);
+    let cur = start; for (const e of els) { if (!e.locked) e[P] = r2(cur); cur += e[Z] + gap; } });
+}
+function addShape(kind) {
+  const card = S().editor.draft.card;
+  const o = { rect: ['rect', {}], rounded: ['rect', { radius: 3 }], ellipse: ['ellipse', {}], circle: ['ellipse', { w: 16, h: 16 }], triangle: ['polygon', { sides: 3 }], polygon: ['polygon', { sides: 6 }], star: ['polygon', { sides: 5, star: true, inner: 0.45 }], line: ['line', {}] }[kind];
+  if (o) addEl(makeEl(o[0], card, o[1]));
+}
 const updEl = (id, patch, key) => edCommit(t => { const e = t.elements.find(x => x.id === id); if (e) Object.assign(e, patch); }, key || ('el:' + id + ':' + Object.keys(patch).join(',')));
 function addEl(el) { edCommit(t => t.elements.push(el)); edSelect(el.id); }
 function dupEl(id) { const ed = S().editor; const src = ed.draft.elements.find(e => e.id === id); if (!src) return; const c = { ...JSON.parse(JSON.stringify(src)), id: uid('el_'), x: r2(src.x + 2), y: r2(src.y + 2), name: src.name ? src.name + ' copy' : '' }; edCommit(t => { const i = t.elements.findIndex(e => e.id === id); t.elements.splice(i + 1, 0, c); }); edSelect(c.id); }
@@ -3540,14 +3639,21 @@ function EditorView() {
       if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? edRedo() : edUndo(); return; }
       if (mod && k === 'y') { e.preventDefault(); edRedo(); return; }
       if (mod && k === 's') { e.preventDefault(); saveEditor(); return; }
-      const id = S().editor?.selectedId; if (!id) return;
-      if (mod && k === 'd') { e.preventDefault(); dupEl(id); return; }
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delEl(id); return; }
+      if (mod && k === 'a') { e.preventDefault(); setSel(S().editor.draft.elements.filter(x => !x.hidden).map(x => x.id)); return; }
+      if (mod && e.shiftKey && k === 'c') { e.preventDefault(); copyStyle(); return; }
+      if (mod && e.shiftKey && k === 'v') { e.preventDefault(); pasteStyle(); return; }
+      if (mod && k === 'c') { if (selList().length) { e.preventDefault(); copySel(); } return; }
+      if (mod && k === 'x') { if (selList().length) { e.preventDefault(); copySel(); delSel(); } return; }
+      if (mod && k === 'v') { if (edClipboard?.length) { e.preventDefault(); pasteClip(); } return; }
+      if (!mod && !e.altKey) { const tool = { t: () => addEl(makeEl('text', S().editor.draft.card, { text: 'Your text' })), r: () => addShape('rect'), e: () => addShape('ellipse'), l: () => addShape('line'), p: () => addShape('polygon'), s: () => addShape('star') }[k]; if (tool && !e.repeat) { e.preventDefault(); tool(); return; } }
+      const ids = selList(); if (!ids.length) return; const id = ids[ids.length - 1];
+      if (mod && k === 'd') { e.preventDefault(); dupSel(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); delSel(); return; }
       if (e.key === 'Escape') { edSelect(null); return; }
       if (mod && (e.key === ']' || e.key === '[')) { e.preventDefault(); moveLayer(id, e.key === ']' ? (e.shiftKey ? 'top' : 'up') : (e.shiftKey ? 'bottom' : 'down')); return; }
-      const st = e.shiftKey ? 5 : S().settings.nudge; const el = S().editor.draft.elements.find(x => x.id === id); if (!el || el.locked) return;
+      const st = e.shiftKey ? 5 : S().settings.nudge;
       const mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
-      if (mv) { e.preventDefault(); updEl(id, { x: r2(el.x + mv[0]), y: r2(el.y + mv[1]) }, 'nudge:' + id); }
+      if (mv) { e.preventDefault(); edCommit(t => { for (const el of t.elements) if (ids.includes(el.id) && !el.locked) { el.x = r2(el.x + mv[0]); el.y = r2(el.y + mv[1]); } }, 'nudge:' + ids.join()); }
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -3599,9 +3705,10 @@ function EditorToolbar() {
     <button className="tool" onClick=${addPhoto} title="Add a photo filled from the spreadsheet"><${Icon} n="photo" size=${18} />Photo</button>
     <button className="tool" onClick=${() => fileRef.current.click()} title="Upload a logo or image"><${Icon} n="image" size=${18} />Logo/Image</button>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${e => { const f = e.target.files[0]; e.target.value = ''; if (f) edAddAsset(f, (d, id, w, h) => { const ww = Math.min(d.card.w * 0.4, 24); const el = makeEl('image', d.card, { imageId: id, w: r2(ww), h: r2(ww * h / w), fit: 'contain', radius: 0, name: f.name.replace(/\.[^.]+$/, '').slice(0, 24) }); d.elements.push(el); edPatchLater(el.id); }); }} />
-    <button className="tool" onClick=${() => addEl(makeEl('rect', card))} title="Add rectangle"><${Icon} n="square" size=${18} />Shape</button>
-    <button className="tool" onClick=${() => addEl(makeEl('ellipse', card))} title="Add ellipse"><${Icon} n="circle" size=${18} />Ellipse</button>
-    <button className="tool" onClick=${() => addEl(makeEl('line', card))} title="Add line"><${Icon} n="line" size=${18} />Line</button>
+    <label className="tool" style=${{ position: 'relative' }} title="Add a shape (R rectangle · E ellipse · L line · P polygon · S star)"><${Icon} n="shapes" size=${18} />Shapes
+      <select aria-label="Add shape" value="" style=${{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} onChange=${e => { if (e.target.value) addShape(e.target.value); }}>
+        <option value="">Add a shape…</option><option value="rect">Rectangle  (R)</option><option value="rounded">Rounded rectangle</option><option value="ellipse">Ellipse  (E)</option><option value="circle">Circle</option>
+        <option value="triangle">Triangle</option><option value="polygon">Hexagon / polygon  (P)</option><option value="star">Star  (S)</option><option value="line">Line  (L)</option></select></label>
     <button className="tool" onClick=${() => { const f = t.fields.find(x => x.key === 'card_no') || t.fields.find(x => x.key === 'employee_id') || t.fields.find(x => x.type === 'text'); addEl(makeEl('barcode', card, { text: f ? `{{${f.key}}}` : '12345678' })); }} title="Add a barcode filled from the spreadsheet"><${Icon} n="barcode" size=${18} />Barcode</button>
     <button className="tool" onClick=${() => { const f = t.fields.find(x => x.key === 'employee_id') || t.fields.find(x => x.type === 'text'); addEl(makeEl('barcode', card, { symbology: 'qr', w: 14, h: 14, showText: false, text: f ? `{{${f.key}}}` : 'https://' })); }} title="Add a QR code"><${Icon} n="qr" size=${18} />QR code</button>
     <button className="tool" onClick=${() => addCover(ed.selectedId)} title="Hide old text in your design with a patch of the colour around it. Select an element first to cover exactly that spot."><${Icon} n="eyeOff" size=${18} />Cover</button>
@@ -3652,7 +3759,9 @@ function EditorStage() {
   const ed = useS(s => s.editor); const tpl = ed.draft; const sel = ed.selectedId; const tick = useS(s => s.tick);
   const snapping = useS(s => s.settings.snapping); const previewRow = useS(s => s.previewRow); const nRows = useS(s => s.dataset?.rows.length || 0);
   const wrapRef = useRef(), canvasRef = useRef(), overlayRef = useRef(); const drag = useRef(null);
-  const [box, setBox] = useState({ w: 700, h: 520 }); const [guides, setGuides] = useState([]); const [hover, setHover] = useState(null);
+  const [box, setBox] = useState({ w: 700, h: 520 }); const [guides, setGuides] = useState([]); const [hover, setHover] = useState(null); const [marq, setMarq] = useState(null);
+  const grid = ed.grid || 0; const multi = ed.multi?.length > 1 ? ed.multi : null;
+  useEffect(() => { const w = wrapRef.current; const onWheel = e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const z = S().editor.zoom || 1; edPatch({ zoom: clamp(Math.round(z * (e.deltaY < 0 ? 1.1 : 1 / 1.1) * 100) / 100, 0.25, 6) }); }; w.addEventListener('wheel', onWheel, { passive: false }); return () => w.removeEventListener('wheel', onWheel); }, []);
   useEffect(() => { const ro = new ResizeObserver(([e]) => setBox({ w: e.contentRect.width, h: e.contentRect.height })); ro.observe(wrapRef.current); return () => ro.disconnect(); }, []);
   const fit = Math.max(2, Math.min((box.w - 64) / tpl.card.w, (Math.max(box.h, 360) - 64) / tpl.card.h));
   const sc = fit * (ed.zoom || 1);
@@ -3677,13 +3786,14 @@ function EditorStage() {
     }
     return null;
   };
-  const snap = (nx, ny, el) => {
+  const snap = (nx, ny, el, skip) => {
     const t = S().editor.draft; const thr = 6 / sc; const gs = [];
     const xs = [0, t.card.w / 2, t.card.w], ys = [0, t.card.h / 2, t.card.h];
-    for (const o of t.elements) { if (o.id === el.id || o.hidden) continue; xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); }
+    for (const o of t.elements) { if (o.id === el.id || o.hidden || (skip && skip.has(o.id))) continue; xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); }
     const best = (pos, size, targets) => { let b = null; for (const off of [0, size / 2, size]) for (const tv of targets) { const d = tv - (pos + off); if (Math.abs(d) <= thr && (!b || Math.abs(d) < Math.abs(b.d))) b = { d, at: tv }; } return b; };
     const bx = best(nx, el.w, xs), by = best(ny, el.h, ys);
     if (bx) { nx += bx.d; gs.push({ a: 'x', at: bx.at }); } if (by) { ny += by.d; gs.push({ a: 'y', at: by.at }); }
+    const g = S().editor.grid || 0; if (g) { if (!bx) nx = Math.round(nx / g) * g; if (!by) ny = Math.round(ny / g) * g; }
     return { x: nx, y: ny, gs };
   };
   const onDown = e => {
@@ -3695,7 +3805,10 @@ function EditorStage() {
       overlayRef.current.setPointerCapture(e.pointerId); e.preventDefault(); return;
     }
     const hit = hitTest(p);
-    if (!hit) { edSelect(null); drag.current = null; return; }
+    if (!hit) { const base = e.shiftKey ? selList() : []; if (!e.shiftKey) edSelect(null); drag.current = { mode: 'marquee', p0: p, base }; overlayRef.current.setPointerCapture(e.pointerId); e.preventDefault(); return; }
+    if (e.shiftKey) { toggleSel(hit.id); drag.current = null; return; }
+    const cur = selList();
+    if (cur.length > 1 && cur.includes(hit.id)) { const els = edS.draft.elements.filter(x => cur.includes(x.id)).map(x => ({ ...x })); edPatch({ selectedId: hit.id }); edBegin(); drag.current = { mode: 'gmove', els, box: bboxOf(els), p0: p, moved: false }; overlayRef.current.setPointerCapture(e.pointerId); e.preventDefault(); return; }
     edSelect(hit.id); if (hit.locked) return;
     edBegin(); drag.current = { mode: 'move', el: { ...hit }, p0: p, moved: false };
     overlayRef.current.setPointerCapture(e.pointerId); e.preventDefault();
@@ -3703,6 +3816,16 @@ function EditorStage() {
   const onMove = e => {
     const d = drag.current; const p = toMM(e);
     if (!d) { const h = hitTest(p); setHover(h ? h.id : null); return; }
+    if (d.mode === 'marquee') { const r = { x: Math.min(d.p0.x, p.x), y: Math.min(d.p0.y, p.y), w: Math.abs(p.x - d.p0.x), h: Math.abs(p.y - d.p0.y) }; d.rect = r; setMarq(r); return; }
+    if (d.mode === 'gmove') {
+      let dx = p.x - d.p0.x, dy = p.y - d.p0.y;
+      if (!d.moved && Math.hypot(dx, dy) * sc < 3) return; d.moved = true;
+      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      let gs = [];
+      if (snapping && !e.altKey) { const s2 = snap(d.box.x + dx, d.box.y + dy, { ...d.box, id: null }, new Set(d.els.map(x => x.id))); dx = s2.x - d.box.x; dy = s2.y - d.box.y; gs = s2.gs; }
+      setGuides(gs); edLive(t => { for (const o of d.els) { if (o.locked) continue; const el = t.elements.find(x => x.id === o.id); if (el) { el.x = r2(o.x + dx); el.y = r2(o.y + dy); } } });
+      return;
+    }
     if (d.mode === 'move') {
       let dx = p.x - d.p0.x, dy = p.y - d.p0.y;
       if (!d.moved && Math.hypot(dx, dy) * sc < 3) return; d.moved = true;
@@ -3721,8 +3844,12 @@ function EditorStage() {
       edLive(t => { const el = t.elements.find(x => x.id === d.el.id); if (el) el.rotation = Math.round(a * 10) / 10; });
     }
   };
-  const onUp = () => { if (drag.current) { edEnd(); drag.current = null; } setGuides([]); };
-  const selEl = tpl.elements.find(e => e.id === sel); const hovEl = hover && hover !== sel ? tpl.elements.find(e => e.id === hover) : null;
+  const onUp = () => {
+    const d = drag.current;
+    if (d?.mode === 'marquee') { const r = d.rect; if (r && (r.w > 0.5 || r.h > 0.5)) { const ids = S().editor.draft.elements.filter(o => !o.hidden && o.x < r.x + r.w && o.x + o.w > r.x && o.y < r.y + r.h && o.y + o.h > r.y).map(o => o.id); setSel([...d.base, ...ids]); } drag.current = null; setMarq(null); return; }
+    if (d) { edEnd(); drag.current = null; } setGuides([]);
+  };
+  const selEl = multi ? null : tpl.elements.find(e => e.id === sel); const multiEls = multi ? tpl.elements.filter(e => multi.includes(e.id)) : []; const hovEl = hover && hover !== sel ? tpl.elements.find(e => e.id === hover) : null;
   const frame = el => ({ left: el.x * sc, top: el.y * sc, width: el.w * sc, height: el.h * sc, transform: `rotate(${el.rotation || 0}deg)` });
   return html`<${Fragment}>
     <div className="stage" ref=${wrapRef}>
@@ -3730,7 +3857,8 @@ function EditorStage() {
         <div className="card-wrap" style=${{ width: tpl.card.w * sc, height: tpl.card.h * sc }}>
           <canvas ref=${canvasRef} style=${{ width: tpl.card.w * sc, height: tpl.card.h * sc, borderRadius: tpl.card.radius * sc }} />
           ${!tpl.elements.length ? html`<p className="small muted" style=${{ position: 'absolute', left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: 'center', padding: '0 12px', pointerEvents: 'none', color: '#5A6A65' }}>Add text, a data field or a photo from the toolbar above.</p>` : null}
-          <div className="overlay" ref=${overlayRef} tabIndex="0" aria-label="Card canvas. Click an element to select it; arrow keys move it."
+          <div className="overlay" ref=${overlayRef} tabIndex="0" aria-label="Card canvas. Click an element to select it; Shift-click or drag a box to select several; arrow keys move them."
+            style=${grid ? { backgroundImage: `linear-gradient(to right, rgba(26,115,232,.14) 1px, transparent 1px), linear-gradient(to bottom, rgba(26,115,232,.14) 1px, transparent 1px)`, backgroundSize: `${grid * sc}px ${grid * sc}px` } : null}
             onPointerDown=${onDown} onPointerMove=${onMove} onPointerUp=${onUp} onPointerCancel=${onUp} onPointerLeave=${() => !drag.current && setHover(null)}
             onDoubleClick=${() => { const el = S().editor.draft.elements.find(x => x.id === S().editor.selectedId); if (el?.type === 'text') setTimeout(() => { const ta = document.getElementById('prop-text'); ta?.focus(); ta?.select(); }, 30); }}>
             ${hovEl ? html`<div className="hoverframe" style=${frame(hovEl)}></div>` : null}
@@ -3739,25 +3867,30 @@ function EditorStage() {
                 ${Object.keys(HANDLES).filter(h => selEl.type !== 'line' || h === 'e' || h === 'w').map(h => { const [hx, hy] = HANDLES[h]; return html`<span key=${h} className="handle" data-handle=${h} style=${{ left: `${(hx + 1) * 50}%`, top: `${(hy + 1) * 50}%`, cursor: HANDLE_CURSOR[h] }}></span>`; })}
                 <span className="rot-stem"></span><span className="rot-handle" data-handle="rot" title="Rotate (Shift snaps to 15°)"></span><//>` : null}
             </div>` : null}
+            ${multiEls.map(m => html`<div key=${'m' + m.id} className="selframe multi" style=${frame(m)}></div>`)}
+            ${multiEls.length ? (() => { const b = bboxOf(multiEls); return html`<div className="selunion" style=${{ left: b.x * sc - 3, top: b.y * sc - 3, width: b.w * sc + 6, height: b.h * sc + 6 }}></div>`; })() : null}
+            ${marq ? html`<div className="marquee" style=${{ left: marq.x * sc, top: marq.y * sc, width: marq.w * sc, height: marq.h * sc }}></div>` : null}
             ${guides.map((g, i) => html`<div key=${i} className="guide" style=${g.a === 'x' ? { left: g.at * sc, top: -12, width: 1, height: tpl.card.h * sc + 24 } : { top: g.at * sc, left: -12, height: 1, width: tpl.card.w * sc + 24 }}></div>`)}
           </div>
         </div>
       </div>
     </div>
     <div className="ed-status">
-      <span className="pill acc">${tpl.editSide === 'back' ? 'Back side' : 'Front side'}</span><span className="num mono">${fmt(tpl.card.w)} × ${fmt(tpl.card.h)} mm</span>
+      <span className="pill acc">${tpl.editSide === 'back' ? 'Back side' : 'Front side'}</span>
+      <label className="row nowrap" style=${{ gap: 4 }} title="Show a grid and snap to it"><${Icon} n="grid" size=${14} /><select className="grid-sel" aria-label="Grid" value=${grid} onChange=${e => edPatch({ grid: +e.target.value })}><option value="0">No grid</option><option value="1">1 mm grid</option><option value="2">2 mm grid</option><option value="5">5 mm grid</option></select></label><span className="num mono">${fmt(tpl.card.w)} × ${fmt(tpl.card.h)} mm</span>
+      ${multi ? html`<span className="num">${multi.length} selected</span>` : null}
       ${selEl ? html`<span className="num mono">X ${fmt(selEl.x)}  Y ${fmt(selEl.y)}  W ${fmt(selEl.w)}  H ${fmt(selEl.h)}${selEl.rotation ? `  ${fmt(selEl.rotation)}°` : ''}</span>` : null}
       ${useData ? html`<span className="row nowrap" style=${{ gap: 4 }}>Previewing row <button className="icon-btn sm" aria-label="Previous row" onClick=${() => Store.set({ previewRow: Math.max(0, previewRow - 1) })}><${Icon} n="left" size=${14} /></button><b className="num">${Math.min(previewRow, nRows - 1) + 1}</b> of ${nRows}<button className="icon-btn sm" aria-label="Next row" onClick=${() => Store.set({ previewRow: Math.min(nRows - 1, previewRow + 1) })}><${Icon} n="right" size=${14} /></button></span>` : null}
       <span className="grow"></span>
-      <span className="tiny faint">Drag to move · Shift keeps proportions · Alt turns off snapping · <span className="kbd">Del</span> removes · <span className="kbd">Ctrl D</span> duplicates</span>
+      <span className="tiny faint">Shift-click or drag a box to select several · Alt turns off snapping · <span className="kbd">Ctrl C</span>/<span className="kbd">V</span> copy, paste · <span className="kbd">Ctrl+wheel</span> zoom · <span className="kbd">T R E L P S</span> add</span>
     </div><//>`;
 }
 function LayersPanel() {
   const ed = useS(s => s.editor); const els = ed.draft.elements.slice().reverse();
-  const ic = el => ({ text: tokensIn(el.text).length ? 'braces' : 'text', image: el.field ? 'photo' : 'image', rect: 'square', ellipse: 'circle', line: 'line', barcode: el.symbology === 'qr' ? 'qr' : 'barcode' }[el.type]);
+  const ic = el => ({ text: tokensIn(el.text).length ? 'braces' : 'text', image: el.field ? 'photo' : 'image', rect: 'square', ellipse: 'circle', polygon: el.star ? 'star' : 'triangle', line: 'line', barcode: el.symbology === 'qr' ? 'qr' : 'barcode' }[el.type]); const sels = new Set(ed.multi || [ed.selectedId]);
   return html`<div className="sec" style=${{ gap: 2, paddingInline: 8 }}>
     ${!els.length ? html`<p className="muted small" style=${{ padding: 8 }}>The card is empty. Add text, a data field or a photo from the toolbar above the card.</p>` : null}
-    ${els.map(el => html`<div key=${el.id} className=${'layer' + (el.id === ed.selectedId ? ' sel' : '') + (el.hidden ? ' dim' : '')} onClick=${() => edSelect(el.id)} role="button" tabIndex="0" onKeyDown=${e => e.key === 'Enter' && edSelect(el.id)}>
+    ${els.map(el => html`<div key=${el.id} className=${'layer' + (sels.has(el.id) ? ' sel' : '') + (el.hidden ? ' dim' : '')} onClick=${e => e.shiftKey || e.metaKey || e.ctrlKey ? toggleSel(el.id) : edSelect(el.id)} role="button" tabIndex="0" onKeyDown=${e => e.key === 'Enter' && edSelect(el.id)}>
       <${Icon} n=${ic(el)} size=${14} /><span className="lname">${elLabel(el)}</span>
       <button className="icon-btn sm" aria-label=${el.hidden ? 'Show' : 'Hide'} title=${el.hidden ? 'Show' : 'Hide'} onClick=${e => { e.stopPropagation(); updEl(el.id, { hidden: !el.hidden }); }}><${Icon} n=${el.hidden ? 'eyeOff' : 'eye'} size=${13} /></button>
       <button className="icon-btn sm" aria-label=${el.locked ? 'Unlock' : 'Lock'} title=${el.locked ? 'Unlock' : 'Lock'} onClick=${e => { e.stopPropagation(); updEl(el.id, { locked: !el.locked }); }}><${Icon} n=${el.locked ? 'lock' : 'unlock'} size=${13} /></button>
@@ -3793,11 +3926,85 @@ function FieldsPanel() {
 }
 // "More options" fold: the everyday settings stay in view, the rest is one click away.
 const More = ({ children, label = 'More options' }) => html`<details className="more"><summary>${label}</summary><div className="stack" style=${{ gap: 10, marginTop: 10 }}>${children}</div></details>`;
+const AlignRow = () => html`<div className="row" style=${{ gap: 2 }}>
+  ${[['left', 'Align left', 'alignL'], ['hcenter', 'Align centres horizontally', 'alignC'], ['right', 'Align right', 'alignR'], ['top', 'Align top', 'vTop'], ['vcenter', 'Align middles', 'vMid'], ['bottom', 'Align bottom', 'vBot']].map(([m, t, i]) => html`<button key=${m} className="icon-btn" title=${t} aria-label=${t} onClick=${() => alignSel(m)}><${Icon} n=${i} size=${16} /></button>`)}</div>`;
+function MultiProps({ ids }) {
+  const d = useS(s => s.editor.draft); const els = d.elements.filter(e => ids.includes(e.id)); const b = bboxOf(els);
+  return html`<div>
+    <div className="sec" style=${{ gap: 8 }}><div className="row nowrap"><button className="icon-btn sm" title="Clear selection" aria-label="Clear selection" onClick=${() => edSelect(null)}><${Icon} n="left" size=${14} /></button><h3 className="grow">${els.length} elements selected</h3>
+      <button className="icon-btn sm" title="Duplicate (Ctrl+D)" aria-label="Duplicate" onClick=${dupSel}><${Icon} n="copy" size=${14} /></button>
+      <button className="icon-btn sm" title="Delete (Del)" aria-label="Delete" onClick=${delSel}><${Icon} n="trash" size=${14} /></button></div>
+      <span className="tiny muted num">${fmt(b.w)} × ${fmt(b.h)} mm · Shift-click to add or remove</span></div>
+    <div className="sec"><h3>Align</h3><${AlignRow} /><span className="tiny muted">Lines them up with each other.</span></div>
+    <div className="sec"><h3>Distribute evenly</h3><div className="row" style=${{ gap: 4 }}>
+      <button className="btn sm" onClick=${() => distributeSel('h')}><${Icon} n="distH" size=${14} />Across</button>
+      <button className="btn sm" onClick=${() => distributeSel('v')}><${Icon} n="distV" size=${14} />Down</button></div></div>
+    <div className="sec"><h3>Style</h3><div className="row" style=${{ gap: 4 }}>
+      <button className="btn sm" disabled=${!styleClipboard} onClick=${pasteStyle} title="Ctrl+Shift+V">Paste style</button>
+      <button className="btn sm" onClick=${() => edCommit(t => t.elements.forEach(e => { if (ids.includes(e.id)) e.locked = true; }))}><${Icon} n="lock" size=${14} />Lock all</button>
+      <button className="btn sm" onClick=${() => edCommit(t => t.elements.forEach(e => { if (ids.includes(e.id)) e.hidden = true; }))}><${Icon} n="eyeOff" size=${14} />Hide all</button></div></div>
+  </div>`;
+}
+const BLENDS = [['normal', 'Normal'], ['multiply', 'Multiply'], ['screen', 'Screen'], ['overlay', 'Overlay'], ['darken', 'Darken'], ['lighten', 'Lighten'], ['color-dodge', 'Colour dodge'], ['color-burn', 'Colour burn'], ['hard-light', 'Hard light'], ['soft-light', 'Soft light'], ['difference', 'Difference'], ['luminosity', 'Luminosity']];
+const Slider = ({ label, value, min, max, step = 1, unit = '', onChange, dflt }) => html`<label className="slider"><span>${label}<b className="num">${value}${unit}</b></span>
+  <input type="range" min=${min} max=${max} step=${step} value=${value} onChange=${e => onChange(+e.target.value)} onDoubleClick=${() => dflt != null && onChange(dflt)} /></label>`;
+function EffectsProps({ el, u }) {
+  const sh = el.shadow || {}; const setSh = p => u({ shadow: { color: '#000000', alpha: 0.35, blur: 1.5, x: 0.6, y: 0.8, ...sh, ...p } }, 'sh' + el.id);
+  return html`<div className="sec"><h3>Effects</h3>
+    <div className="grid2"><${Fld} label="Blend mode"><select className="inp" value=${el.blend || 'normal'} onChange=${e => u({ blend: e.target.value })}>${BLENDS.map(([v, l]) => html`<option key=${v} value=${v}>${l}</option>`)}</select><//>
+      <${Fld} label="Opacity"><${NumIn} value=${Math.round((el.opacity ?? 1) * 100)} min=${0} max=${100} step=${5} dp=${0} unit="%" onChange=${v => u({ opacity: v / 100 })} /><//></div>
+    <${Check} checked=${!!sh.on} onChange=${v => setSh({ on: v })}>Drop shadow / glow</${Check}>
+    ${sh.on ? html`<div className="grid2"><${Fld} label="Shadow colour"><${ColorIn} value=${sh.color || '#000000'} onChange=${v => setSh({ color: v })} label="Shadow colour" /><//>
+      <${Fld} label="Strength"><${NumIn} value=${Math.round((sh.alpha ?? 0.35) * 100)} min=${0} max=${100} step=${5} dp=${0} unit="%" onChange=${v => setSh({ alpha: v / 100 })} /><//>
+      <${Fld} label="Softness"><${NumIn} value=${sh.blur ?? 1.5} min=${0} max=${20} step=${0.25} unit="mm" onChange=${v => setSh({ blur: v })} /><//>
+      <${Fld} label="Move right"><${NumIn} value=${sh.x ?? 0.6} min=${-20} max=${20} step=${0.1} unit="mm" onChange=${v => setSh({ x: v })} /><//>
+      <${Fld} label="Move down"><${NumIn} value=${sh.y ?? 0.8} min=${-20} max=${20} step=${0.1} unit="mm" onChange=${v => setSh({ y: v })} /><//></div>
+      <div className="row" style=${{ gap: 4 }}><button className="btn sm" onClick=${() => setSh({ x: 0, y: 0, blur: 2, alpha: 0.8 })}>Glow</button><button className="btn sm" onClick=${() => setSh({ x: 0.6, y: 0.8, blur: 1.5, alpha: 0.35 })}>Soft shadow</button><button className="btn sm" onClick=${() => setSh({ x: 0.5, y: 0.5, blur: 0, alpha: 0.6 })}>Hard shadow</button></div>` : null}
+    ${el.type === 'text' ? html`<${Check} checked=${(el.outline?.width || 0) > 0} onChange=${v => u({ outline: { color: el.outline?.color || '#FFFFFF', width: v ? 0.25 : 0 } })}>Text outline (stroke)</${Check}>
+      ${el.outline?.width > 0 ? html`<div className="grid2"><${Fld} label="Outline colour"><${ColorIn} value=${el.outline.color} onChange=${v => u({ outline: { ...el.outline, color: v } }, 'ol' + el.id)} label="Outline colour" /><//>
+        <${Fld} label="Outline width"><${NumIn} value=${el.outline.width} min=${0.05} max=${3} step=${0.05} unit="mm" onChange=${v => u({ outline: { ...el.outline, width: v } })} /><//></div>` : null}` : null}
+    <div className="row" style=${{ gap: 4 }}>
+      <button className="btn sm" aria-pressed=${!!el.flipX} style=${{ background: el.flipX ? 'var(--accent-soft)' : undefined }} onClick=${() => u({ flipX: !el.flipX })}><${Icon} n="flipH" size=${14} />Flip ↔</button>
+      <button className="btn sm" aria-pressed=${!!el.flipY} style=${{ background: el.flipY ? 'var(--accent-soft)' : undefined }} onClick=${() => u({ flipY: !el.flipY })}><${Icon} n="flipV" size=${14} />Flip ↕</button>
+      <button className="btn sm" onClick=${copyStyle} title="Ctrl+Shift+C">Copy style</button>
+      <button className="btn sm" disabled=${!styleClipboard} onClick=${pasteStyle} title="Ctrl+Shift+V">Paste style</button></div>
+  </div>`;
+}
+function FillProps({ el, u }) {
+  const grad = el.fillType && el.fillType !== 'solid';
+  return html`<div className="sec"><h3>Colour</h3>
+    <${Seg} label="Fill type" value=${el.fillType || 'solid'} onChange=${v => u({ fillType: v, ...(v !== 'solid' && !el.fill2 ? { fill2: '#FFFFFF', fill: el.fill && el.fill !== 'none' ? el.fill : '#111111' } : {}) })} options=${[['solid', 'Solid'], ['linear', 'Gradient'], ['radial', 'Radial']]} />
+    <div className="grid2"><${Fld} label=${grad ? 'From' : 'Fill'}><${ColorIn} value=${el.fill} allowNone onChange=${v => u({ fill: v }, 'fill' + el.id)} label="Fill" /><//>
+      ${grad ? html`<${Fld} label="To"><${ColorIn} value=${el.fill2} onChange=${v => u({ fill2: v }, 'fill2' + el.id)} label="Gradient end colour" /><//>` : null}</div>
+    ${el.fillType === 'linear' ? html`<${Slider} label="Gradient angle" value=${el.gradAngle ?? 90} min=${0} max=${360} step=${5} unit="°" dflt=${90} onChange=${v => u({ gradAngle: v }, 'ga' + el.id)} />` : null}
+    ${el.type === 'rect' ? html`<button className="btn sm" style=${{ alignSelf: 'flex-start' }} title="Pick the colour around this shape, to hide what's underneath" onClick=${() => u({ fill: sampleBackground(S().editor.draft, el, el.id), fillType: 'solid' })}>Match background colour</button>` : null}
+    ${el.type === 'polygon' ? html`<div className="grid2"><${Fld} label=${el.star ? 'Points' : 'Sides'}><${NumIn} value=${el.sides} min=${3} max=${24} step=${1} dp=${0} onChange=${v => u({ sides: Math.round(v) })} /><//>
+      <${Fld} label="Shape"><${Seg} label="Polygon or star" value=${el.star ? 'star' : 'poly'} onChange=${v => u({ star: v === 'star' })} options=${[['poly', 'Polygon'], ['star', 'Star']]} /><//></div>
+      ${el.star ? html`<${Slider} label="Inner radius" value=${Math.round((el.inner ?? 0.5) * 100)} min=${10} max=${95} unit="%" dflt=${50} onChange=${v => u({ inner: v / 100 }, 'in' + el.id)} />` : null}` : null}
+    <div className="grid2"><${Fld} label="Border colour"><${ColorIn} value=${el.stroke} onChange=${v => u({ stroke: v }, 'stroke' + el.id)} label="Border colour" /><//><${Fld} label="Border width"><${NumIn} value=${el.strokeWidth} min=${0} max=${20} step=${0.1} unit="mm" onChange=${v => u({ strokeWidth: v })} /><//></div>
+    ${el.type === 'rect' ? html`<${Fld} label="Corner radius"><${NumIn} value=${el.radius} min=${0} max=${100} step=${0.2} unit="mm" onChange=${v => u({ radius: v })} /><//>` : null}
+  </div>`;
+}
+function AdjustProps({ el, u }) {
+  const a = { brightness: 100, contrast: 100, saturate: 100, hue: 0, blur: 0, gray: false, sepia: false, ...(el.adj || {}) };
+  const set = p => u({ adj: { ...a, ...p } }, 'adj' + el.id + Object.keys(p).join());
+  const changed = el.adj && Object.entries(a).some(([k, v]) => v !== { brightness: 100, contrast: 100, saturate: 100, hue: 0, blur: 0, gray: false, sepia: false }[k]);
+  return html`<div className="sec"><div className="row nowrap"><h3 className="grow">Adjust photo</h3>${changed ? html`<button className="btn sm ghost" onClick=${() => u({ adj: null })}>Reset</button>` : null}</div>
+    <${Slider} label="Brightness" value=${a.brightness} min=${30} max=${180} unit="%" dflt=${100} onChange=${v => set({ brightness: v })} />
+    <${Slider} label="Contrast" value=${a.contrast} min=${30} max=${180} unit="%" dflt=${100} onChange=${v => set({ contrast: v })} />
+    <${Slider} label="Saturation" value=${a.saturate} min=${0} max=${200} unit="%" dflt=${100} onChange=${v => set({ saturate: v })} />
+    <${Slider} label="Hue" value=${a.hue} min=${-180} max=${180} unit="°" dflt=${0} onChange=${v => set({ hue: v })} />
+    <${Slider} label="Blur" value=${a.blur} min=${0} max=${12} step=${0.5} unit="px" dflt=${0} onChange=${v => set({ blur: v })} />
+    <div className="row"><${Check} checked=${a.gray} onChange=${v => set({ gray: v })}>Black & white</${Check}><${Check} checked=${a.sepia} onChange=${v => set({ sepia: v })}>Sepia</${Check}></div>
+    <span className="tiny muted">Double-click a slider to reset it. Applies to every person's photo.</span></div>`;
+}
 function PropsPanel() {
-  const ed = useS(s => s.editor); const el = ed.draft.elements.find(e => e.id === ed.selectedId);
+  const ed = useS(s => s.editor); const ids = ed.multi?.length > 1 ? ed.multi.filter(id => ed.draft.elements.some(e => e.id === id)) : null;
+  if (ids && ids.length > 1) return html`<${MultiProps} ids=${ids} />`;
+  const el = ed.draft.elements.find(e => e.id === ed.selectedId);
   if (!el) return html`<${CardProps} />`;
   const u = (patch, key) => updEl(el.id, patch, key);
-  const typeName = { text: tokensIn(el.text).length ? 'Text from spreadsheet' : 'Fixed text', image: el.field ? 'Photo from spreadsheet' : 'Image', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', barcode: el.symbology === 'qr' ? 'QR code' : 'Barcode' }[el.type];
+  const typeName = { text: tokensIn(el.text).length ? 'Text from spreadsheet' : 'Fixed text', image: el.field ? 'Photo from spreadsheet' : 'Image', rect: 'Rectangle', ellipse: 'Ellipse', polygon: elLabel({ ...el, name: '' }), line: 'Line', barcode: el.symbology === 'qr' ? 'QR code' : 'Barcode' }[el.type];
   return html`<div>
     <div className="sec" style=${{ gap: 8 }}>
       <div className="row nowrap"><button className="icon-btn sm" title="Back to card settings" aria-label="Back to card settings" onClick=${() => edSelect(null)}><${Icon} n="left" size=${14} /></button><h3 className="grow">${typeName}</h3>
@@ -3808,11 +4015,8 @@ function PropsPanel() {
     ${el.type === 'text' ? html`<${TextProps} el=${el} u=${u} />` : null}
     ${el.type === 'image' ? html`<${ImageProps} el=${el} u=${u} />` : null}
     ${el.type === 'barcode' ? html`<${BarcodeProps} el=${el} u=${u} />` : null}
-    ${['rect', 'ellipse'].includes(el.type) ? html`<div className="sec"><h3>Colour</h3>
-      <${Fld} label="Fill"><${ColorIn} value=${el.fill} allowNone onChange=${v => u({ fill: v }, 'fill' + el.id)} label="Fill" /><//>
-      ${el.type === 'rect' ? html`<button className="btn sm" style=${{ alignSelf: 'flex-start' }} title="Pick the colour around this shape, to hide what's underneath" onClick=${() => u({ fill: sampleBackground(S().editor.draft, el, el.id) })}>Match background colour</button>` : null}
-      <${More}><div className="grid2"><${Fld} label="Border colour"><${ColorIn} value=${el.stroke} onChange=${v => u({ stroke: v }, 'stroke' + el.id)} label="Border colour" /><//><${Fld} label="Border width"><${NumIn} value=${el.strokeWidth} min=${0} max=${20} step=${0.1} unit="mm" onChange=${v => u({ strokeWidth: v })} /><//></div>
-      ${el.type === 'rect' ? html`<${Fld} label="Corner radius"><${NumIn} value=${el.radius} min=${0} max=${100} step=${0.2} unit="mm" onChange=${v => u({ radius: v })} /><//>` : null}<//></div>` : null}
+    ${['rect', 'ellipse', 'polygon'].includes(el.type) ? html`<${FillProps} el=${el} u=${u} />` : null}
+    ${el.type === 'image' ? html`<${AdjustProps} el=${el} u=${u} />` : null}
     ${el.type === 'line' ? html`<div className="sec"><h3>Line</h3>
       <div className="grid2"><${Fld} label="Colour"><${ColorIn} value=${el.stroke} onChange=${v => u({ stroke: v }, 'stroke' + el.id)} label="Line colour" /><//><${Fld} label="Thickness"><${NumIn} value=${el.strokeWidth} min=${0.05} max=${20} step=${0.05} unit="mm" onChange=${v => u({ strokeWidth: v })} /><//></div>
       <${Seg} label="Line style" value=${el.dash || 'solid'} onChange=${v => u({ dash: v })} options=${[['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} /></div>` : null}
@@ -3821,11 +4025,9 @@ function PropsPanel() {
         <${Fld} label="Left (X)"><${NumIn} value=${el.x} unit="mm" onChange=${v => u({ x: v })} /><//><${Fld} label="Top (Y)"><${NumIn} value=${el.y} unit="mm" onChange=${v => u({ y: v })} /><//>
         <${Fld} label="Width"><${NumIn} value=${el.w} min=${0.5} unit="mm" onChange=${v => u({ w: v })} /><//><${Fld} label=${el.type === 'line' ? 'Grab area' : 'Height'}><${NumIn} value=${el.h} min=${0.5} unit="mm" onChange=${v => u({ h: v })} /><//>
       </div>
-      <div className="row" style=${{ gap: 4 }}>
-        <button className="btn sm" title="Centre horizontally on the card" onClick=${() => u({ x: r2((ed.draft.card.w - el.w) / 2) })}>Centre ↔</button>
-        <button className="btn sm" title="Centre vertically on the card" onClick=${() => u({ y: r2((ed.draft.card.h - el.h) / 2) })}>Centre ↕</button></div>
-      <${More} label="Rotate, transparency, layer order">
-        <div className="grid2"><${Fld} label="Rotation"><${NumIn} value=${el.rotation || 0} min=${-360} max=${360} step=${1} dp=${1} unit="°" onChange=${v => u({ rotation: v })} /><//><${Fld} label="Opacity"><${NumIn} value=${Math.round((el.opacity ?? 1) * 100)} min=${0} max=${100} step=${5} dp=${0} unit="%" onChange=${v => u({ opacity: v / 100 })} /><//></div>
+      <div className="stack" style=${{ gap: 4 }}><span className="tiny muted">Align on the card</span><${AlignRow} /></div>
+      <${More} label="Rotate, layer order">
+        <div className="grid2"><${Fld} label="Rotation"><${NumIn} value=${el.rotation || 0} min=${-360} max=${360} step=${1} dp=${1} unit="°" onChange=${v => u({ rotation: v })} /><//></div>
         <div className="row" style=${{ gap: 4 }}>
           <button className="btn sm" onClick=${() => moveLayer(el.id, 'top')} title="Bring to front (Ctrl+Shift+])"><${Icon} n="toTop" size=${14} />Front</button>
           <button className="btn sm" onClick=${() => moveLayer(el.id, 'up')} title="Bring forward (Ctrl+])"><${Icon} n="up" size=${14} />Forward</button>
@@ -3833,6 +4035,7 @@ function PropsPanel() {
           <button className="btn sm" onClick=${() => moveLayer(el.id, 'bottom')} title="Send to back (Ctrl+Shift+[)"><${Icon} n="toBottom" size=${14} />Back</button></div>
         <${Fld} label="Layer name"><input className="inp" placeholder="Shown in the Layers list" value=${el.name || ''} onChange=${e => u({ name: e.target.value }, 'name' + el.id)} /><//>
       <//></div>
+    <${EffectsProps} el=${el} u=${u} />
   </div>`;
 }
 function TextProps({ el, u }) {
@@ -3954,7 +4157,7 @@ function CardProps() {
   </div>`;
 }
 function edSwitchSide(side) {
-  const ed = S().editor; const cur = ed.draft.editSide || 'front'; if (cur === side) return;
+  const ed = S().editor; const cur = ed.draft.editSide || 'front'; if (cur === side) return; edPatch({ multi: null });
   let d = cloneTpl(ed.draft);
   if (!d.back) { d.back = { elements: [], bg: { color: '#FFFFFF', imageId: null, fit: 'cover' } }; Store.set({ editor: { ...ed, past: [...ed.past.slice(-79), ed.draft], future: [], dirty: true } }); }
   swapSides(d); Store.set(s => ({ editor: { ...s.editor, draft: d, selectedId: null } })); syncWorkflow(d);
