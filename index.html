@@ -3302,7 +3302,7 @@ function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
   return html`<div className="dv-back" onMouseDown=${e => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="dv" role="dialog" aria-modal="true" aria-label=${it.name}
       onTouchStart=${e => { touchX.current = e.touches[0].clientX; }} onTouchEnd=${e => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; touchX.current = null; if (Math.abs(dx) > 45) go_(dx < 0 ? 1 : -1); }}>
-      <div className="dv-head"><div><h2>${it.name}</h2><span className="small muted num">${index + 1} of ${n}${tpl ? ` · ${fmt(tpl.card.w)} × ${fmt(tpl.card.h)} mm` : ''}</span></div>
+      <div className="dv-head"><div><h2>${it.name}</h2><span className="small muted num">${index + 1} of ${n}</span></div>
         <button className="icon-btn" onClick=${onClose} aria-label="Close"><${Icon} n="x" /></button></div>
       <div className="dv-stage">
         <button className="dv-arrow l" onClick=${() => go_(-1)} aria-label="Previous design"><${Icon} n="left" size=${26} /></button>
@@ -3311,7 +3311,7 @@ function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
           : html`<${CardSides} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH} />`) : html`<span className="muted">Loading…</span>`}</div></div>
         <button className="dv-arrow r" onClick=${() => go_(1)} aria-label="Next design"><${Icon} n="right" size=${26} /></button>
       </div>
-      <div className="dv-foot">${hadBack ? html`<label className="switch"><input type="checkbox" checked=${withBack} onChange=${e => setWithBack(e.target.checked)} /><span className="tr" aria-hidden="true"></span>Back side</label>` : null}<span className="small muted dv-hint">Use the arrows${'ontouchstart' in window ? ' or swipe' : ' or ← → keys'} to see other designs</span>
+      <div className="dv-foot">${hadBack ? html`<label className="switch"><input type="checkbox" checked=${withBack} onChange=${e => setWithBack(e.target.checked)} /><span className="tr" aria-hidden="true"></span>Back side</label>` : null}<span className="dv-hint"></span>
         <button className="btn" onClick=${() => onEdit(it, hadBack && !withBack)}><${Icon} n="edit" size=${15} />Edit</button>
         <button className="btn primary" onClick=${() => onUse(it, hadBack && !withBack)}>Use this design<${Icon} n="arrowRight" /></button></div>
     </div></div>`;
