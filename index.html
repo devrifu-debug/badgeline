@@ -298,6 +298,27 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 }
 
 /* ---- simple 3-step shell ---- */
+.dthumb .zoom{position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--surface);color:var(--fg);box-shadow:var(--shadow);opacity:0;transition:opacity .12s}
+.dthumb:hover .zoom,.dthumb:focus-visible .zoom{opacity:1}
+.dv-back{position:fixed;inset:0;z-index:60;background:rgba(6,10,9,.72);display:grid;place-items:center;padding:16px}
+.dv{background:var(--surface);border-radius:14px;box-shadow:var(--shadow-card);width:min(980px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line)}
+.dv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.dv-head h2{font-size:18px}
+.dv-stage{position:relative;display:flex;align-items:center;justify-content:center;gap:12px;padding:24px 16px;background:var(--stage);background-image:radial-gradient(var(--stage-dot) 1px,transparent 1px);background-size:16px 16px;min-height:280px}
+.dv-card{display:flex;justify-content:center;animation:dvIn .18s ease-out;min-width:0}
+@keyframes dvIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+.dv-arrow{flex:none;width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
+.dv-arrow:hover{border-color:var(--accent);color:var(--accent-ink)}
+.dv-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.dv-hint{margin-right:auto}
+@media (max-width:640px){
+  .dv-back{padding:8px}
+  .dv-stage{padding:16px 8px}
+  .dv-arrow{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;z-index:2;opacity:.92}
+  .dv-arrow.l{left:6px}.dv-arrow.r{right:6px}
+  .dv-hint{display:none}
+  .dv-foot .btn{flex:1;justify-content:center}
+}
 .shero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .shero-row .shero{flex:1 1 420px}
 .topnav{gap:8px}
@@ -2921,17 +2942,18 @@ function StepNav({ back, next, nextLabel, nextDisabled }) {
 function DesignView() {
   const list = useS(s => s.templates); const cur = useS(s => s.template);
   const [tag, setTag] = useState('All'); const starters = useMemo(() => STARTERS.map(s => ({ ...s, tpl: s.make() })), []);
+  const [view, setView] = useState(null);
   const shown = tag === 'All' ? starters : starters.filter(s => s.tags.includes(tag));
   const pick = t => { useTemplate(t, { silent: true }); go('import'); };
   const openSaved = async (id, edit) => { try { const t = await Persist.loadTemplate(id); if (!t) return; edit ? openInEditor(t) : pick(t); } catch (e) { toast(e.message || 'Could not open that design.', 'err'); } };
+  // everything the popup can slide through: my designs first, then the ready-made ones under the current filter
+  const items = [...list.map(t => ({ key: t.id, name: t.name, savedId: t.id })), ...shown.map(s => ({ key: s.key, name: s.name, tpl: s.tpl, make: s.make }))];
+  const open = key => setView(items.findIndex(i => i.key === key));
   return html`<div className="page spage">
-    <div className="shero"><h1>Choose a card design</h1><p>Pick a ready-made design or upload your own. You can change any text, colour or position with <b>Edit</b>.</p></div>
-    ${cur ? html`<div className="selbar"><${Icon} n="check" /><span className="grow">Selected: <b>${cur.name}</b></span>
-      <button className="btn" onClick=${() => openInEditor(cur)}><${Icon} n="edit" size=${15} />Edit</button>
-      <button className="btn primary" onClick=${() => go('import')}>Next: add people<${Icon} n="arrowRight" /></button></div>` : null}
+    <div className="shero"><h1>Choose a card design</h1><p>Click a design to see it bigger. Press <b>Use</b> to make cards with it, or <b>Edit</b> to change its text, colours or layout.</p></div>
     ${list.length ? html`<section className="stack" style=${{ gap: 12 }}><h2>My designs</h2>
       <div className="dgrid">${list.map(t => html`<article key=${t.id} className=${'dcard' + (cur?.id === t.id ? ' on' : '')}>
-        <button className="dthumb" onClick=${() => openSaved(t.id)} aria-label=${'Use ' + t.name}>${t.thumb ? html`<img src=${t.thumb} alt="" />` : html`<${Icon} n="cards" size=${28} />`}</button>
+        <button className="dthumb" onClick=${() => open(t.id)} aria-label=${'See ' + t.name + ' bigger'}>${t.thumb ? html`<img src=${t.thumb} alt="" />` : html`<${Icon} n="cards" size=${28} />`}<span className="zoom"><${Icon} n="zoomIn" size=${16} /></span></button>
         <div className="dmeta"><span className="dname">${t.name}</span>
           <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => openSaved(t.id)}>Use</button><button className="btn sm" onClick=${() => openSaved(t.id, true)}>Edit</button>
           <${ConfirmBtn} label="" confirm="Delete design?" onConfirm=${async () => { await Persist.deleteTemplate(t.id); await refreshTemplates(); toast('Design deleted'); }} /></div></div></article>`)}</div></section>` : null}
@@ -2940,11 +2962,48 @@ function DesignView() {
         <div className="row"><button className="btn" onClick=${() => openDesignUpload(false)}><${Icon} n="upload" />Upload my design</button><button className="btn ghost" onClick=${() => openInEditor('new')}><${Icon} n="plus" />Blank card</button></div></div>
       <div className="filters" role="group" aria-label="Filter designs">${STARTER_TAGS.filter(t => t === 'All' || STARTERS.some(s => s.tags.includes(t))).map(t => html`<button key=${t} aria-pressed=${tag === t} onClick=${() => setTag(t)}>${t}</button>`)}</div>
       <div className="dgrid">${shown.map(s => html`<article key=${s.key} className="dcard">
-        <button className="dthumb" onClick=${() => pick(s.make())} aria-label=${'Use ' + s.name}><${CardPreview} tpl=${s.tpl} row=${null} useData=${false} maxW=${150} maxH=${150} /></button>
+        <button className="dthumb" onClick=${() => open(s.key)} aria-label=${'See ' + s.name + ' bigger'}><${CardPreview} tpl=${s.tpl} row=${null} useData=${false} maxW=${150} maxH=${150} /><span className="zoom"><${Icon} n="zoomIn" size=${16} /></span></button>
         <div className="dmeta"><span className="dname">${s.name}</span>
           <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => pick(s.make())}>Use</button><button className="btn sm" onClick=${() => openInEditor(s.make())}>Edit</button></div></div></article>`)}</div>
     </section>
+    ${view != null && items[view] ? html`<${DesignViewer} items=${items} index=${view} setIndex=${setView} onClose=${() => setView(null)}
+      onUse=${it => it.savedId ? openSaved(it.savedId) : pick(it.make())} onEdit=${it => it.savedId ? openSaved(it.savedId, true) : openInEditor(it.make())} />` : null}
   </div>`;
+}
+function DesignViewer({ items, index, setIndex, onClose, onUse, onEdit }) {
+  const it = items[index]; const n = items.length;
+  const [tpl, setTpl] = useState(it.tpl || null); const touchX = useRef(null);
+  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => { const r = () => setSize({ w: window.innerWidth, h: window.innerHeight }); window.addEventListener('resize', r); return () => window.removeEventListener('resize', r); }, []);
+  useEffect(() => {
+    let alive = true; setTpl(it.tpl || null);
+    if (it.savedId) Persist.loadTemplate(it.savedId).then(t => { if (alive && t) { AssetCache.ensure(t); setTpl(t); } }).catch(() => {});
+    return () => { alive = false; };
+  }, [it.key]);
+  const go_ = d => setIndex((index + d + n) % n);
+  useEffect(() => {
+    const k = e => { if (e.key === 'ArrowRight') go_(1); else if (e.key === 'ArrowLeft') go_(-1); else if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  });
+  const two = tpl && hasBack(tpl); const narrow = size.w < 640;
+  const maxW = Math.min(narrow ? size.w - 48 : (two ? 760 : 460), size.w - (narrow ? 48 : 180));
+  const maxH = Math.max(220, size.h - (narrow ? 260 : 250));
+  return html`<div className="dv-back" onMouseDown=${e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="dv" role="dialog" aria-modal="true" aria-label=${it.name}
+      onTouchStart=${e => { touchX.current = e.touches[0].clientX; }} onTouchEnd=${e => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; touchX.current = null; if (Math.abs(dx) > 45) go_(dx < 0 ? 1 : -1); }}>
+      <div className="dv-head"><div><h2>${it.name}</h2><span className="small muted num">${index + 1} of ${n}${tpl ? ` · ${fmt(tpl.card.w)} × ${fmt(tpl.card.h)} mm` : ''}</span></div>
+        <button className="icon-btn" onClick=${onClose} aria-label="Close"><${Icon} n="x" /></button></div>
+      <div className="dv-stage">
+        <button className="dv-arrow l" onClick=${() => go_(-1)} aria-label="Previous design"><${Icon} n="left" size=${26} /></button>
+        <div className="dv-card" key=${it.key}>${tpl ? (two && narrow
+          ? html`<div className="stack" style=${{ gap: 10, alignItems: 'center' }}><${CardPreview} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH / 2 - 20} /><${CardPreview} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH / 2 - 20} side="back" /></div>`
+          : html`<${CardSides} tpl=${tpl} row=${null} useData=${false} maxW=${maxW} maxH=${maxH} />`) : html`<span className="muted">Loading…</span>`}</div>
+        <button className="dv-arrow r" onClick=${() => go_(1)} aria-label="Next design"><${Icon} n="right" size=${26} /></button>
+      </div>
+      <div className="dv-foot"><span className="small muted dv-hint">Use the arrows${'ontouchstart' in window ? ' or swipe' : ' or ← → keys'} to see other designs</span>
+        <button className="btn" onClick=${() => onEdit(it)}><${Icon} n="edit" size=${15} />Edit</button>
+        <button className="btn primary" onClick=${() => onUse(it)}>Use this design<${Icon} n="arrowRight" /></button></div>
+    </div></div>`;
 }
 
 /* Step 2 */
