@@ -4216,14 +4216,38 @@ function addPerson() {
   if (!ds || ds.isExample) { startEmptyList(); return; }
   const rows = [...ds.rows, ds.columns.map(() => '')]; const lines = [...ds.lines, (ds.lines[ds.lines.length - 1] || ds.headerLine) + 1];
   Store.set({ dataset: { ...ds, rows, lines, version: ds.version + 1 }, modal: { type: 'row', row: rows.length - 1, isNew: true } }); touch();
+  fillDemoRow(rows.length - 1);
+}
+// New people typed in the app start with example values (same people as the demo sheet), photo and signature included.
+// The boxes select their text on click, so typing replaces the example straight away.
+const demoRows = new Set();
+async function fillDemoRow(r) {
+  const st = S(); const ds = st.dataset, tpl = st.template; if (!ds || !tpl) return;
+  const i = r % 3, n = r;
+  const valueFor = key => { const f = tpl.fields.find(x => x.key === key); if (!f) return '';
+    if (key === 'employee_id') return 'EMP-' + (1001 + n); if (key === 'card_no') return 'CARD-' + String(n + 1).padStart(4, '0');
+    const d = DEMO_VALUES[key]; if (d) return d[i]; const sm = f.sample || ''; return f.unique && sm ? `${sm}-${n + 1}` : sm; };
+  Store.set(s => { const d = s.dataset; const rows = d.rows.slice(); const row = rows[r].slice();
+    d.columns.forEach((c, ci) => { const key = Object.keys(s.mapping).find(k => s.mapping[k] === c); const f = key && tpl.fields.find(x => x.key === key); if (!key || f?.type === 'image' || row[ci]) return; row[ci] = valueFor(key); });
+    rows[r] = row; return { dataset: { ...d, rows, version: d.version + 1 } }; });
+  demoRows.add(r); touch();
+  const first = (valueFor('name') || 'person').split(' ')[0].toLowerCase();
+  for (const k of imageFieldKeys(tpl)) {
+    const sign = /sign/i.test(k + (tpl.fields.find(f => f.key === k)?.label || ''));
+    const blob = await demoPicture(sign ? 'sign' : 'photo', i, valueFor('name'));
+    PhotoLib.overrides.set(r + ':' + k, { name: `example ${sign ? 'signature' : 'photo'}`, blob });
+  }
+  Store.set(s0 => ({ photoVersion: s0.photoVersion + 1 })); touch();
 }
 function templateColumns(tpl) { return tpl.fields.filter(f => usedFieldKeys(tpl).has(f.key) || f.required).map(f => f.label); }
 function startEmptyList() {
   const st = S(); const tpl = st.template; if (!tpl) { toast('Choose a template first.', 'err'); return; }
   if (PhotoLib.isExample) PhotoLib.clear();
   const columns = templateColumns(tpl);
+  demoRows.clear();
   setDataset({ fileName: 'Typed in Badgeline', sheetNames: ['List'], sheetName: 'List', columns, rows: [columns.map(() => '')], lines: [2], headerLine: 1, isExample: false, version: 1, colOffset: 0 });
   Store.set({ modal: { type: 'row', row: 0, isNew: true } });
+  fillDemoRow(0);
 }
 // A demo Excel for the chosen design: its real column names, three example people (with a sample picture inside each
 // photo / signature cell, so people see where pictures go) and a "How to fill" tab. Upload it back and it just works.
@@ -4566,7 +4590,8 @@ function RowEditor({ row, onClose, isNew }) {
       <button className="btn" disabled=${row >= ds.rows.length - 1} onClick=${() => goTo(row + 1)}>Next<${Icon} n="right" /></button>
       <button className="btn" onClick=${() => addPerson()}><${Icon} n="plus" />Add another</button>
       <button className="btn primary" onClick=${close}>Done</button><//>`}>
-    ${rs ? html`<div className="stack" style=${{ gap: 4 }}>${rs.list.map((x, i) => html`<div key=${i} className=${'banner ' + (x.severity === 'error' ? 'err' : 'warn')} style=${{ padding: '7px 12px' }}><${Icon} n="alert" size=${14} /><span className="grow">${x.msg}</span></div>`)}</div>` : null}
+    ${demoRows.has(row) ? html`<div className="banner"><${Icon} n="info" /><div className="grow">These are <b>example values</b> so you can see how the card looks. Click a box and type to replace it, and use <b>Change</b> to put in the real photo.</div></div>`
+      : rs ? html`<div className="stack" style=${{ gap: 4 }}>${rs.list.map((x, i) => html`<div key=${i} className=${'banner ' + (x.severity === 'error' ? 'err' : 'warn')} style=${{ padding: '7px 12px' }}><${Icon} n="alert" size=${14} /><span className="grow">${x.msg}</span></div>`)}</div>` : null}
     <div className="row" style=${{ alignItems: 'flex-start', gap: 20 }}>
       ${tpl ? html`<div className="preview-box" style=${{ minHeight: 0, padding: 16, flex: '0 1 auto' }}><${CardSides} tpl=${tpl} row=${row} maxW=${hasBack(tpl) ? 340 : 220} maxH=${280} /></div>` : null}
       <div className="stack grow" style=${{ minWidth: 220, gap: 10 }}>
@@ -4577,7 +4602,7 @@ function RowEditor({ row, onClose, isNew }) {
             <label className="btn sm"><${Icon} n="upload" size=${14} />${r.status === 'found' ? 'Change' : 'Add'}<input type="file" accept="image/*" hidden onChange=${e => { const f = e.target.files[0]; e.target.value = ''; setRowPhoto(row, k, f); }} /></label>
             ${r.override ? html`<button className="btn sm ghost" onClick=${() => clearRowPhoto(row, k)}>Undo</button>` : null}</div></div>`; })}
         ${ds.columns.map((c, i) => isImgCol(c) ? null : html`<${Fld} key=${c} label=${html`<span className="row nowrap" style=${{ gap: 6 }}>${c}${fieldOf(c)?.required ? html`<span style=${{ color: 'var(--err)' }}>*</span>` : null}</span>`}>
-          <input className="inp" value=${ds.rows[row][i] ?? ''} autoFocus=${isNew && i === 0} onChange=${e => updateCell(row, i, e.target.value)} /><//>`)}
+          <input className="inp" value=${ds.rows[row][i] ?? ''} autoFocus=${isNew && i === 0} onFocus=${e => { const t = e.target; setTimeout(() => t.select(), 0); }} onMouseUp=${e => e.preventDefault()} onChange=${e => { demoRows.delete(row); updateCell(row, i, e.target.value); }} /><//>`)}
       </div></div>
     <p className="tiny muted">Changes are saved as you type. They update this list only; fix your original Excel file too if you'll reuse it.</p>
   <//>`;
