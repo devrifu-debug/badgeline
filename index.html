@@ -517,6 +517,8 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 .modal{border-radius:16px}
 .toast{border-radius:10px}
 @media (max-width:600px){ .shero h1{font-size:26px;letter-spacing:-.6px} .spage{padding-top:24px} .shead{padding:0 12px} .sstep{padding:0 12px 0 6px} }
+.shero.big h1{font-size:52px;line-height:1.05;letter-spacing:-2px}
+@media (max-width:600px){.shero.big h1{font-size:34px;letter-spacing:-1px}}
 </style>
 
 </head>
@@ -3156,7 +3158,7 @@ function DesignView() {
   const items = [...list.map(t => ({ key: t.id, name: t.name, savedId: t.id })), ...shown.map(s => ({ key: s.key, name: s.name, tpl: s.tpl, make: s.make }))];
   const open = key => setView(items.findIndex(i => i.key === key));
   return html`<div className="page spage">
-    <div className="shero"><h1>Choose a card design</h1><p>Click a design to see it bigger. Press <b>Use</b> to make cards with it, or <b>Edit</b> to change its text, colours or layout.</p></div>
+    <div className="shero big"><h1>Choose a card design</h1></div>
     ${list.length ? html`<section className="stack" style=${{ gap: 12 }}><h2>My designs</h2>
       <div className="dgrid">${list.map(t => html`<article key=${t.id} className=${'dcard' + (cur?.id === t.id ? ' on' : '')}>
         <button className="dthumb" onClick=${() => open(t.id)} aria-label=${'See ' + t.name + ' bigger'}>${t.thumb ? html`<img src=${t.thumb} alt="" />` : html`<${Icon} n="cards" size=${28} />`}<span className="zoom"><${Icon} n="zoomIn" size=${16} /></span></button>
