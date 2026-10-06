@@ -4254,7 +4254,10 @@ async function downloadExcelTemplate() {
   const tpl = S().template; if (!tpl) { toast('Choose a design first.', 'err'); return; }
   try {
     await ensureFonts({ ...tpl, elements: [{ type: 'text', font: 'Great Vibes', weight: 400 }] }).catch(() => {});
-    const fields = tpl.fields.filter(f => usedFieldKeys(tpl).has(f.key) || f.required);
+    // picture columns first (A, B…) so the photos are visible as soon as the file opens, not scrolled off to the right
+    const fields0 = tpl.fields.filter(f => usedFieldKeys(tpl).has(f.key) || f.required);
+    const isSign = f => /sign/i.test(f.key + f.label);
+    const fields = [...fields0.filter(f => f.type === 'image' && !isSign(f)), ...fields0.filter(f => f.type === 'image' && isSign(f)), ...fields0.filter(f => f.type !== 'image')];
     const cols = fields.map(f => f.label);
     const val = (f, i) => { if (f.type === 'image') return ''; const d = DEMO_VALUES[f.key]; if (d) return d[i]; const sm = f.sample || f.label; return f.unique ? `${sm}-${i + 1}` : sm; };
     const rows = [0, 1, 2].map(i => fields.map(f => val(f, i)));
