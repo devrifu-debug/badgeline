@@ -534,6 +534,8 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 .filters.full::-webkit-scrollbar{display:none}
 .filters.full button{flex:1 0 auto;white-space:nowrap}
 .shero-row .shero.big{flex:1 1 auto}
+.demo-box{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;border-radius:10px;background:var(--surface-2)}
+.demo-box .grow{min-width:220px}
 </style>
 
 </head>
@@ -3342,9 +3344,8 @@ function PeopleView() {
             <${Dropzone} accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv" onFiles=${fs => load(fs[0])}><span className="small"><b>Replace</b> with another file</span><//>`
           : html`<${Dropzone} id="sheet-file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv" onFiles=${fs => load(fs[0])}>
               <${Icon} n="table" size=${30} /><b>${busy ? 'Reading…' : 'Drop your Excel or CSV file here'}</b><span className="small">or click to choose a file. Pictures pasted into the Excel cells are picked up automatically.</span><//>`}
-          ${!own ? html`<div className="row small" style=${{ gap: 6 }}><span className="muted">No list yet?</span>
-            <button className="linkbtn" onClick=${downloadExcelTemplate}>Download an empty Excel for this design</button><span className="muted">or</span>
-            <button className="linkbtn" onClick=${addPerson}>type names here</button></div>` : null}
+          ${!own ? html`<div className="demo-box"><${Icon} n="table" size=${22} /><div className="grow"><b>Not sure how to make the list?</b><div className="small muted">Download a demo Excel made for this design: the right columns, 3 example people with sample photos in their cells, and a step-by-step "How to fill" tab.</div></div>
+            <div className="row nowrap" style=${{ gap: 6 }}><button className="btn" onClick=${downloadExcelTemplate}><${Icon} n="download" />Demo sheet</button><button className="btn ghost" onClick=${addPerson}>Type names here</button></div></div>` : null}
           ${own ? html`<${PhotoSummary} />` : null}
         </div></section>
     </div>
@@ -4224,16 +4225,78 @@ function startEmptyList() {
   setDataset({ fileName: 'Typed in Badgeline', sheetNames: ['List'], sheetName: 'List', columns, rows: [columns.map(() => '')], lines: [2], headerLine: 1, isExample: false, version: 1, colOffset: 0 });
   Store.set({ modal: { type: 'row', row: 0, isNew: true } });
 }
+// A demo Excel for the chosen design: its real column names, three example people (with a sample picture inside each
+// photo / signature cell, so people see where pictures go) and a "How to fill" tab. Upload it back and it just works.
+const DEMO_VALUES = {
+  name: ['Rahim Uddin', 'Nusrat Jahan', 'Tanvir Ahmed'], job_title: ['Office Executive', 'Accountant', 'Sales Manager'], department: ['Admin', 'Accounts', 'Sales'],
+  employee_id: ['EMP-1001', 'EMP-1002', 'EMP-1003'], phone: ['+880 1711-000001', '+880 1811-000002', '+880 1911-000003'], email: ['rahim@company.com', 'nusrat@company.com', 'tanvir@company.com'],
+  address: ['House 12, Road 5, Dhanmondi, Dhaka', 'Flat 4B, Mirpur-10, Dhaka', 'Sonadanga, Khulna'], emergency_contact: ['+880 1711-111111', '+880 1811-222222', '+880 1911-333333'],
+  blood_group: ['A+', 'B+', 'O+'], dob: ['15/06/1995', '02/11/1992', '21/03/1990'], nid: ['1995123456789', '1992123456789', '1990123456789'], father_name: ['Abdul Karim', 'Jamal Hossain', 'Mizanur Rahman'],
+  class: ['Ten', 'Nine', 'Eight'], roll: ['12', '7', '23'], section: ['A', 'B', 'A'], session: ['2025-26', '2025-26', '2025-26'], issue_date: ['01/01/2026', '01/01/2026', '01/01/2026'],
+  valid_thru: ['31/12/2027', '31/12/2027', '31/12/2027'], card_no: ['CARD-0001', 'CARD-0002', 'CARD-0003'], access_level: ['Level 1', 'Level 2', 'Level 3'], social: ['@rahim', '@nusrat', '@tanvir'],
+  company: ['Acme Traders Ltd.', 'Bright Media', 'Delta Logistics'], host: ['Ms. Farzana Rahman', 'Mr. Kamal Hasan', 'Ms. Sadia Islam'], ticket: ['Speaker', 'Visitor', 'Staff'], plan: ['Gold · 12 months', 'Silver · 6 months', 'Basic · 3 months'],
+};
+function demoPicture(kind, i, name) {
+  const c = document.createElement('canvas'); const x = c.getContext('2d');
+  if (kind === 'sign') { c.width = 330; c.height = 120; x.fillStyle = '#1F3A8A'; x.font = 'italic 52px "Great Vibes", "Brush Script MT", cursive'; x.textBaseline = 'middle'; x.fillText((name || 'Signature').split(' ')[0], 18, 64, 300); }
+  else {
+    c.width = 240; c.height = 300; const tint = ['#DCE7F5', '#F5E3DC', '#DFF2E5'][i % 3], fg = ['#9DB4D6', '#D6AE9D', '#A3CFB1'][i % 3];
+    x.fillStyle = tint; x.fillRect(0, 0, 240, 300); x.fillStyle = fg; x.beginPath(); x.arc(120, 118, 52, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.ellipse(120, 300, 100, 105, 0, Math.PI, 0); x.fill();
+    x.fillStyle = '#5B6470'; x.font = '600 22px Inter, Arial, sans-serif'; x.textAlign = 'center'; x.fillText('SAMPLE PHOTO', 120, 34);
+  }
+  return new Promise(r => c.toBlob(b => r(b), 'image/png'));
+}
 async function downloadExcelTemplate() {
-  const tpl = S().template; if (!tpl) { toast('Choose a template first.', 'err'); return; }
-  const cols = templateColumns(tpl); const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([cols]); ws['!cols'] = cols.map(c => ({ wch: Math.max(14, c.length + 4) }));
-  XLSX.utils.book_append_sheet(wb, ws, 'List');
-  const fieldInfo = tpl.fields.filter(f => cols.includes(f.label)).map(f => [f.label, f.type === 'image' ? 'Paste the picture into this cell, or type its file name (e.g. rahim.jpg)' : f.format === 'email' ? 'Email address' : f.format === 'phone' ? 'Phone number' : 'Text', f.required ? 'Required' : 'Optional', f.unique ? 'Must be different for each person' : '']);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['How to fill this file for: ' + tpl.name], [], ['Column', 'What to put in it', '', ''], ...fieldInfo, [], ['One row per person. Keep the column names in row 1 as they are.']]), 'How to fill');
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-  try { await saveFile(sanitizeFilename(tpl.name + ' list').replace(/\s+/g, '-').toLowerCase() + '.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); }
-  catch (e) { if (e?.code !== 'declined') toast(e.message || 'Could not save the file.', 'err'); }
+  const tpl = S().template; if (!tpl) { toast('Choose a design first.', 'err'); return; }
+  try {
+    await ensureFonts({ ...tpl, elements: [{ type: 'text', font: 'Great Vibes', weight: 400 }] }).catch(() => {});
+    const fields = tpl.fields.filter(f => usedFieldKeys(tpl).has(f.key) || f.required);
+    const cols = fields.map(f => f.label);
+    const val = (f, i) => { if (f.type === 'image') return ''; const d = DEMO_VALUES[f.key]; if (d) return d[i]; const sm = f.sample || f.label; return f.unique ? `${sm}-${i + 1}` : sm; };
+    const rows = [0, 1, 2].map(i => fields.map(f => val(f, i)));
+    const wb = XLSX.utils.book_new(); const ws = XLSX.utils.aoa_to_sheet([cols, ...rows]);
+    const imgCols = fields.map((f, c) => f.type === 'image' ? { c, kind: /sign/i.test(f.key + f.label) ? 'sign' : 'photo' } : null).filter(Boolean);
+    ws['!cols'] = fields.map((f, c) => { const ic = imgCols.find(x => x.c === c); return { wch: ic ? (ic.kind === 'sign' ? 18 : 13) : Math.max(14, f.label.length + 3, ...rows.map(r => String(r[c]).length + 2)) }; });
+    const hasPhoto = imgCols.some(x => x.kind === 'photo'); ws['!rows'] = [{ hpt: 22 }, ...rows.map(() => ({ hpt: hasPhoto ? 64 : imgCols.length ? 34 : 18 }))];
+    XLSX.utils.book_append_sheet(wb, ws, 'List');
+    const guide = [
+      ['HOW TO FILL THIS SHEET  ·  design: ' + tpl.name], [],
+      ['Step 1', 'Open the "List" tab. Row 1 has the column names. Do not change them.'],
+      ['Step 2', 'Each row below is one person. The 3 people there now are only examples: type over them or delete them.'],
+      ...(imgCols.length ? [['Step 3', 'Pictures: click the person\'s cell in the ' + imgCols.map(x => '"' + cols[x.c] + '"').join(' / ') + ' column, then Insert → Pictures → Place in Cell (or paste the picture on top of that cell). The app finds each picture in its row automatically.']] : []),
+      [imgCols.length ? 'Step 4' : 'Step 3', 'Save the file as .xlsx and upload it in step 2 "Add people".'], [],
+      ['Column', 'What to put in it', 'Required?', 'Example'],
+      ...fields.map((f, c) => [f.label, f.type === 'image' ? 'A picture placed inside the cell' : f.format === 'email' ? 'Email address' : f.format === 'phone' ? 'Phone number' : f.unique ? 'Text, different for every person' : 'Text', f.required ? 'Yes' : 'No', f.type === 'image' ? '(sample picture)' : rows[0][c]]),
+      [], ['Tip', 'Long names are fine: the card makes the text smaller to fit.'], ['Tip', 'Leave a cell empty if a person has no value for it.'],
+    ];
+    const gs = XLSX.utils.aoa_to_sheet(guide); gs['!cols'] = [{ wch: 14 }, { wch: 70 }, { wch: 11 }, { wch: 26 }];
+    XLSX.utils.book_append_sheet(wb, gs, 'How to fill');
+    let out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    if (imgCols.length) { // add the sample pictures as real pictures anchored inside the cells
+      const zip = await JSZip.loadAsync(out); const E = 12700; const anchors = []; let n = 0;
+      for (const ic of imgCols) for (let i = 0; i < 3; i++) {
+        n++; zip.file(`xl/media/demo${n}.png`, await demoPicture(ic.kind, i, rows[i][fields.findIndex(f => f.key === 'name')]));
+        const [w, h] = ic.kind === 'sign' ? [92 * E, 30 * E] : [40 * E, 50 * E];
+        anchors.push(`<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${ic.c}</xdr:col><xdr:colOff>${5 * E}</xdr:colOff><xdr:row>${i + 1}</xdr:row><xdr:rowOff>${5 * E}</xdr:rowOff></xdr:from><xdr:to><xdr:col>${ic.c}</xdr:col><xdr:colOff>${5 * E + w}</xdr:colOff><xdr:row>${i + 1}</xdr:row><xdr:rowOff>${5 * E + h}</xdr:rowOff></xdr:to><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${n + 1}" name="Sample ${n}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rIdP${n}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor>`);
+      }
+      const NS = 'http://schemas.openxmlformats.org/package/2006/relationships', RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+      zip.file('xl/drawings/drawing1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${RT}">${anchors.join('')}</xdr:wsDr>`);
+      zip.file('xl/drawings/_rels/drawing1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${NS}">${Array.from({ length: n }, (_, k) => `<Relationship Id="rIdP${k + 1}" Type="${RT}/image" Target="../media/demo${k + 1}.png"/>`).join('')}</Relationships>`);
+      const relPath = 'xl/worksheets/_rels/sheet1.xml.rels'; const drawRel = `<Relationship Id="rIdDemoDrawing" Type="${RT}/drawing" Target="../drawings/drawing1.xml"/>`;
+      const oldRels = zip.file(relPath) ? await zip.file(relPath).async('string') : null;
+      zip.file(relPath, oldRels ? oldRels.replace('</Relationships>', drawRel + '</Relationships>') : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${NS}">${drawRel}</Relationships>`);
+      let sx = await zip.file('xl/worksheets/sheet1.xml').async('string');
+      if (!/xmlns:r=/.test(sx.slice(0, 600))) sx = sx.replace('<worksheet ', `<worksheet xmlns:r="${RT}" `);
+      sx = sx.replace('</worksheet>', '<drawing r:id="rIdDemoDrawing"/></worksheet>'); zip.file('xl/worksheets/sheet1.xml', sx);
+      let ct = await zip.file('[Content_Types].xml').async('string');
+      if (!/Extension="png"/i.test(ct)) ct = ct.replace('<Default ', '<Default Extension="png" ContentType="image/png"/><Default ');
+      ct = ct.replace('</Types>', '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+      zip.file('[Content_Types].xml', ct);
+      out = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+    }
+    await saveFile(sanitizeFilename(tpl.name + ' demo sheet').replace(/\s+/g, '-').toLowerCase() + '.xlsx', new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) { if (e?.code !== 'declined') toast(e.message || 'Could not make the demo sheet.', 'err'); }
 }
 // Rows copied from Excel or Google Sheets arrive as tab-separated text.
 function pasteRows(text) {
