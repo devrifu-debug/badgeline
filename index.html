@@ -8,7 +8,7 @@
 <title>Badgeline Card Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Lato:wght@400;700;900&family=Open+Sans:wght@400;600;700;800&family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700;800&family=Merriweather:wght@400;700;900&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Great+Vibes&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&family=Poppins:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800&family=Lato:wght@400;700;900&family=Open+Sans:wght@400;600;700;800&family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700;800&family=Merriweather:wght@400;700;900&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Great+Vibes&display=swap">
 <style>
 /* Layout: workbench — nav rail at left (bottom tabs on phones), a step track across the top, work surface below. */
 :root{
@@ -400,6 +400,123 @@ details.adv:not(.panel) summary{padding:8px 0}
   .dgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .shero h1{font-size:23px}
 }
+
+/* ===== Clean neutral theme (after getdesign.md · Cal.com DESIGN.md) =====
+   White canvas, near-black primary actions, light-grey cards, Inter type, 8px controls / 12px cards,
+   pill-in-pill step switcher. Monochrome at the action layer; colour only for status. */
+:root{
+  --bg:#ffffff; --surface:#ffffff; --surface-2:#f5f5f5; --surface-soft:#f8f9fa; --line:#e5e7eb; --line-2:#d4d6db;
+  --fg:#111111; --body:#374151; --muted:#6b7280; --faint:#898989;
+  --accent:#111111; --accent-fg:#ffffff; --accent-soft:#f3f4f6; --accent-ink:#111111;
+  --ok:#047857; --ok-soft:#ecfdf5; --warn:#b45309; --warn-soft:#fffbeb; --err:#dc2626; --err-soft:#fef2f2;
+  --stage:#f5f5f5; --stage-dot:#e5e7eb;
+  --shadow:0 1px 2px rgba(0,0,0,.05); --shadow-md:0 4px 12px rgba(0,0,0,.08); --shadow-card:0 1px 2px rgba(0,0,0,.05),0 12px 32px rgba(0,0,0,.12);
+  --font-ui:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; --font-display:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --r:12px; --r-sm:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0a0a0a; --surface:#121212; --surface-2:#1a1a1a; --surface-soft:#161616; --line:#262626; --line-2:#363636;
+  --fg:#f5f5f5; --body:#d4d4d8; --muted:#a1a1aa; --faint:#71717a;
+  --accent:#ffffff; --accent-fg:#111111; --accent-soft:#1f1f1f; --accent-ink:#ffffff;
+  --ok:#34d399; --ok-soft:#0c2a20; --warn:#fbbf24; --warn-soft:#2a210c; --err:#f87171; --err-soft:#2c1414;
+  --stage:#0e0e0e; --stage-dot:#1f1f1f;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-md:0 4px 12px rgba(0,0,0,.4); --shadow-card:0 1px 2px rgba(0,0,0,.5),0 16px 40px rgba(0,0,0,.55);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a0a0a; --surface:#121212; --surface-2:#1a1a1a; --surface-soft:#161616; --line:#262626; --line-2:#363636;
+  --fg:#f5f5f5; --body:#d4d4d8; --muted:#a1a1aa; --faint:#71717a;
+  --accent:#ffffff; --accent-fg:#111111; --accent-soft:#1f1f1f; --accent-ink:#ffffff;
+  --ok:#34d399; --ok-soft:#0c2a20; --warn:#fbbf24; --warn-soft:#2a210c; --err:#f87171; --err-soft:#2c1414;
+  --stage:#0e0e0e; --stage-dot:#1f1f1f; color-scheme:dark}
+body{font:14px/1.5 var(--font-ui);color:var(--fg)}
+h1,h2,h3{font-family:var(--font-display);font-weight:600}
+h1{font-size:32px;line-height:1.15;letter-spacing:-1px}
+h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* buttons & inputs: 40px, 8px radius, weight 600 */
+.btn{height:40px;padding:0 18px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-size:14px;font-weight:600;box-shadow:var(--shadow)}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg);box-shadow:none}
+.btn.primary:hover{filter:none;opacity:.88;background:var(--accent)}
+.btn.primary:disabled{background:var(--line);border-color:var(--line);color:var(--muted);opacity:1}
+.btn.ghost{box-shadow:none;border-color:transparent}
+.btn.sm{height:32px;padding:0 12px;font-size:13px;border-radius:8px}
+.btn.lg{height:44px;padding:0 22px;font-size:15px}
+.icon-btn{border-radius:8px}
+.inp,select.inp,textarea.inp{height:40px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:14px;background:var(--surface)}
+.inp:focus{outline:none;border-color:var(--fg);box-shadow:0 0 0 3px color-mix(in srgb,var(--fg) 10%,transparent)}
+.linkbtn{color:var(--fg)}
+
+/* surfaces */
+.content{background:var(--bg)}
+.panel{border-radius:12px;box-shadow:none;border:1px solid var(--line)}
+.panel-head{padding:18px 20px;border-bottom:1px solid var(--line)}
+.panel-body{padding:20px;gap:16px}
+.banner{border-radius:10px;padding:12px 16px;background:var(--surface-2);color:var(--fg);font-size:13.5px}
+.banner.warn{background:var(--warn-soft);color:var(--warn)} .banner.err{background:var(--err-soft);color:var(--err)}
+.loaded{border-radius:10px;background:var(--surface-2)}
+.drop{border:1.5px dashed var(--line-2);border-radius:12px;background:var(--surface-soft);padding:28px}
+.drop.over{border-color:var(--fg);background:var(--surface-2)}
+.tbl-wrap{border-radius:10px}
+.tbl th{background:var(--surface-soft);font-weight:600;color:var(--muted);font-size:12px}
+.pill{background:var(--surface-2);color:var(--fg);font-weight:500}
+.seg{border:0;background:var(--surface-2);border-radius:999px;padding:4px;gap:2px}
+.seg button{height:30px;border-radius:999px;padding:0 12px;font-weight:500}
+.seg button+button{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
+
+/* header: wordmark left, pill-in-pill step switcher centred */
+.shead{height:64px;min-height:64px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--bg)}
+.brand b{font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:-.4px}
+.brand-mark{background:var(--fg)}
+.brand-mark::before,.brand-mark::after{background:var(--bg)}
+.brand-mark::after{box-shadow:0 4px 0 var(--bg)}
+.ssteps{background:var(--surface-2);border-radius:999px;padding:5px;gap:2px}
+.ssep{display:none}
+.sstep{height:36px;padding:0 16px 0 8px;font-size:14px;font-weight:500;color:var(--muted);border-radius:999px}
+.sstep:hover{background:transparent;color:var(--fg)}
+.sstep .n{width:22px;height:22px;font-size:12px;font-weight:600;border:0;background:var(--line);color:var(--muted)}
+.sstep.done .n{background:var(--fg);color:var(--bg);border:0}
+.sstep[aria-current="step"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08),0 1px 6px rgba(0,0,0,.04)}
+.sstep[aria-current="step"] .n{background:var(--fg);color:var(--bg)}
+
+/* page rhythm */
+.spage{padding-top:40px;gap:28px;max-width:1120px}
+.shero h1{font-size:34px;letter-spacing:-1.2px}
+.shero p{color:var(--muted);font-size:16px;margin-top:8px}
+
+/* design gallery: light-grey card holding the product (the card), white meta below */
+.dgrid{grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:20px}
+.dcard{border-radius:12px;border:1px solid var(--line);background:var(--surface);box-shadow:none;transition:box-shadow .15s,border-color .15s}
+.dcard:hover{border-color:var(--line-2);box-shadow:var(--shadow-md)}
+.dcard.on{border-color:var(--fg);box-shadow:0 0 0 1px var(--fg)}
+.dthumb{height:200px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.dmeta{padding:14px 14px 16px;gap:10px}
+.dname{font-size:14px;font-weight:600}
+.filters{gap:4px;background:var(--surface-2);border-radius:999px;padding:5px;width:max-content;max-width:100%;flex-wrap:wrap}
+.filters button{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:500;padding:7px 14px;border-radius:999px}
+.filters button:hover{color:var(--fg)}
+.filters button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+/* download step */
+.fmt{border-radius:10px;padding:14px 16px;border:1px solid var(--line)}
+.fmt.on{border-color:var(--fg);background:var(--surface-soft);box-shadow:0 0 0 1px var(--fg)}
+.fmt input{accent-color:var(--fg)}
+.dlbtn{height:48px;border-radius:10px;font-size:15px}
+.gcard .im{background:var(--surface-2);border-radius:10px}
+.gcard:hover .im{outline:1px solid var(--fg)}
+.preview-box{border-radius:12px}
+
+/* popup */
+.dv{border-radius:16px}
+.dv-arrow{width:44px;height:44px;border:1px solid var(--line);box-shadow:var(--shadow)}
+.dv-arrow:hover{border-color:var(--fg);color:var(--fg)}
+.switch input:checked + .tr{background:var(--fg)}
+.switch .tr::after{background:var(--bg)}
+.modal{border-radius:16px}
+.toast{border-radius:10px}
+@media (max-width:600px){ .shero h1{font-size:26px;letter-spacing:-.6px} .spage{padding-top:24px} .shead{padding:0 12px} .sstep{padding:0 12px 0 6px} }
 </style>
 
 </head>
