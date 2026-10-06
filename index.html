@@ -1998,27 +1998,27 @@ async function cardToSvg(tpl0, rec, side) {
   // background
   const bg = tpl.card.bg || {};
   body.push(`<rect id="Background" width="${W}" height="${H}" fill="${bg.color || '#FFFFFF'}"/>`);
-  if (bg.imageId && tpl.assets[bg.imageId]) body.push(`<image id="Background_image" width="${W}" height="${H}" preserveAspectRatio="${bg.fit === 'contain' ? 'xMidYMid meet' : bg.fit === 'fill' ? 'none' : 'xMidYMid slice'}" href="${tpl.assets[bg.imageId]}"/>`);
+  if (bg.imageId && tpl.assets[bg.imageId]) body.push(`<image id="Background_image" width="${W}" height="${H}" preserveAspectRatio="${bg.fit === 'contain' ? 'xMidYMid meet' : bg.fit === 'fill' ? 'none' : 'xMidYMid slice'}" xlink:href="${tpl.assets[bg.imageId]}"/>`);
   for (const el of tpl.elements) {
     if (el.hidden) continue;
     const w = el.w, h = el.h; let attrs = `transform="translate(${n3(el.x + w / 2)} ${n3(el.y + h / 2)}) rotate(${el.rotation || 0}) scale(${el.flipX ? -1 : 1} ${el.flipY ? -1 : 1}) translate(${n3(-w / 2)} ${n3(-h / 2)})"`;
     if ((el.opacity ?? 1) < 1) attrs += ` opacity="${n3(el.opacity)}"`;
     if (el.blend && el.blend !== 'normal') attrs += ` style="mix-blend-mode:${el.blend}"`;
-    if (el.shadow?.on) { const sh = el.shadow, fid = id('sh'); defs.push(`<filter id="${fid}" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="${n3(sh.x ?? 0.6)}" dy="${n3(sh.y ?? 0.8)}" stdDeviation="${n3((sh.blur ?? 1.5) / 2)}" flood-color="${sh.color || '#000000'}" flood-opacity="${sh.alpha ?? 0.35}"/></filter>`); attrs += ` filter="url(#${fid})"`; }
+    if (el.shadow?.on) { const sh = el.shadow, fid = id('sh'); defs.push(`<filter id="${fid}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur in="SourceAlpha" stdDeviation="${n3((sh.blur ?? 1.5) / 2)}"/><feOffset dx="${n3(sh.x ?? 0.6)}" dy="${n3(sh.y ?? 0.8)}" result="sho"/><feFlood flood-color="${sh.color || '#000000'}" flood-opacity="${sh.alpha ?? 0.35}"/><feComposite in2="sho" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>`); attrs += ` filter="url(#${fid})"`; }
     const name = xmlEsc((elLabel(el) || el.type).replace(/[{}]/g, '').slice(0, 60));
     let inner = '';
     if (el.type === 'rect') inner = `<rect width="${n3(w)}" height="${n3(h)}" rx="${n3(Math.min(el.radius || 0, w / 2, h / 2))}" fill="${paint(el)}"${stroke(el)}/>`;
     else if (el.type === 'ellipse') inner = `<ellipse cx="${n3(w / 2)}" cy="${n3(h / 2)}" rx="${n3(w / 2)}" ry="${n3(h / 2)}" fill="${paint(el)}"${stroke(el)}/>`;
     else if (el.type === 'polygon') { const nS = clamp(el.sides | 0 || 5, 3, 24), pts = el.star ? nS * 2 : nS, inr = clamp(el.inner ?? 0.5, 0.1, 0.95); const P = []; for (let i = 0; i < pts; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / pts, r = el.star && i % 2 ? inr : 1; P.push(`${n3(w / 2 + Math.cos(a) * w / 2 * r)},${n3(h / 2 + Math.sin(a) * h / 2 * r)}`); } inner = `<polygon points="${P.join(' ')}" fill="${paint(el)}"${stroke(el)}/>`; }
     else if (el.type === 'line') { const lw = Math.max(0.05, el.strokeWidth || 0.3); inner = `<line x1="0" y1="${n3(h / 2)}" x2="${n3(w)}" y2="${n3(h / 2)}" stroke="${el.stroke || '#000'}" stroke-width="${n3(lw)}"${el.dash === 'dashed' ? ` stroke-dasharray="${n3(lw * 3)} ${n3(lw * 2)}"` : el.dash === 'dotted' ? ` stroke-dasharray="0.01 ${n3(lw * 2)}" stroke-linecap="round"` : ''}/>`; }
-    else if (el.type === 'image') { inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec)}"/>`; }
+    else if (el.type === 'image') { inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" xlink:href="${await elementPng(tpl, el, rec)}"/>`; }
     else if (el.type === 'text') {
       // Text is flattened to a 600 dpi picture so names, IDs and dates can't be retyped in Illustrator.
       if (!Render.resolveText(el, rec)) continue;
-      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec, 600)}"/>`;
+      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" xlink:href="${await elementPng(tpl, el, rec, 600)}"/>`;
     } else if (el.type === 'barcode' && el.showText && el.symbology !== 'qr') {
       if (!Render.resolveText({ ...el, transform: 'none' }, rec)) continue;
-      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" href="${await elementPng(tpl, el, rec, 600)}"/>`;
+      inner = `<image width="${n3(w)}" height="${n3(h)}" preserveAspectRatio="none" xlink:href="${await elementPng(tpl, el, rec, 600)}"/>`;
     } else if (el.type === 'barcode') {
       const text = Render.resolveText({ ...el, transform: 'none' }, rec); if (!text) continue;
       const parts = []; if (el.bg && el.bg !== 'none') parts.push(`<rect width="${n3(w)}" height="${n3(h)}" fill="${el.bg}"/>`);
@@ -2033,7 +2033,7 @@ async function cardToSvg(tpl0, rec, side) {
     body.push(`<g id="${name.replace(/[^A-Za-z0-9_-]+/g, '_')}_${uidn++}" ${attrs}>${inner}</g>`);
   }
   const r = tpl.card.radius || 0; const clip = r > 0 ? `<clipPath id="card"><rect width="${W}" height="${H}" rx="${r}"/></clipPath>` : '';
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<defs>${clip}${defs.join('')}</defs>\n<g${r > 0 ? ' clip-path="url(#card)"' : ''}>\n${body.join('\n')}\n</g>\n</svg>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n<defs>${clip}${defs.join('')}</defs>\n<g${r > 0 ? ' clip-path="url(#card)"' : ''}>\n${body.join('\n')}\n</g>\n</svg>\n`;
 }
 let agPsdLoading = null;
 function loadAgPsd() { if (window.agPsd) return Promise.resolve(window.agPsd); return agPsdLoading ||= new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/ag-psd@31.0.2/dist/bundle.js'; sc.onload = () => res(window.agPsd); sc.onerror = () => { agPsdLoading = null; rej(new Error('Could not load the Photoshop exporter. Check your internet connection.')); }; document.head.appendChild(sc); }); }
