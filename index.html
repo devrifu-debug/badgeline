@@ -539,6 +539,11 @@ h2{font-size:18px;line-height:1.4;letter-spacing:-.2px}
 .modal-body > *{flex-shrink:0}
 .changer-box{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft)}
 .changer-box:empty{display:none}
+.fmts{gap:6px}
+.fmt{padding:10px 14px;align-items:center}
+.fmt.on{align-items:flex-start}
+.fmt-h{margin-top:4px;margin-bottom:-6px}
+@media (max-width:900px){ .dlgrid .dlside{order:-1} }
 </style>
 
 </head>
@@ -3596,12 +3601,12 @@ function SimpleDownload() {
             <${Check} checked=${policy === 'include'} onChange=${on => { Store.set({ errorPolicy: on ? 'include' : 'skip' }); }}>Include them anyway</${Check}></div></div></div>
           ${showIssues ? html`<div className="issues sm">${errList.slice(0, 200).map((x, i) => html`<div key=${i} className="issue error"><span className="ln">${(cellValue(x.row, 'name') || 'Row ' + (x.row + 1)).slice(0, 22)}</span><span className="grow">${x.msg}</span><button className="btn sm" onClick=${() => Store.set({ previewRow: x.row, modal: { type: 'row', row: x.row } })}>Fix</button></div>`)}</div>` : null}`
         : html`<div className="loaded ok"><${Icon} n="check" size=${20} /><div className="grow"><b>All ${plural(ds.rows.length, 'card')}</b> look good</div></div>`}
-      <div className="fmts" role="radiogroup" aria-label="File type">${SIMPLE_FORMATS.map(([k, l, d]) => (hasBack(tpl) && cfg.backSide !== false) ? [k, l, d] : k === 'pdf-pairs' ? [k, 'PDF – each card separately', "Every person's card with their name and cut marks"] : k === 'pdf-sheet' ? [k, 'PDF – cards packed on pages', 'As many cards on each page as fit, for cutting'] : [k, l, d]).map(([k, l, d]) => html`<label key=${k} className=${'fmt' + (cfg.format === k ? ' on' : '')}><input type="radio" name="fmt" checked=${cfg.format === k} onChange=${() => set({ format: k })} /><span><b>${l}</b><span className="small muted">${d}</span></span></label>`)}</div>
-      ${hasBack(tpl) ? html`<${Check} checked=${cfg.backSide !== false} onChange=${on => set({ backSide: on })}>Include the back side</${Check}>` : null}
       <button className="btn primary lg dlbtn" disabled=${running || !fresh || !count || (cfg.format === 'pdf-sheet' && !L.fits)} onClick=${downloadAll}><${Icon} n="download" size=${20} />${running ? 'Preparing…' : `Download ${plural(count, 'card')}`}</button>
       ${running ? html`<div className="stack"><${Progress} value=${job.total ? job.done / job.total : 1} /><span className="small muted num">${job.label}${job.total ? ` · ${job.done}/${job.total}` : ''}</span></div>` : null}
       ${job?.status === 'done' ? html`<div className="loaded ok"><${Icon} n="check" size=${18} /><div className="grow small">${job.label}</div></div>` : null}
       ${job?.status === 'error' ? html`<span className="small" style=${{ color: 'var(--err)' }}>${job.label}</span>` : null}
+      <span className="eyebrow fmt-h">File type</span><div className="fmts" role="radiogroup" aria-label="File type">${SIMPLE_FORMATS.map(([k, l, d]) => (hasBack(tpl) && cfg.backSide !== false) ? [k, l, d] : k === 'pdf-pairs' ? [k, 'PDF – each card separately', "Every person's card with their name and cut marks"] : k === 'pdf-sheet' ? [k, 'PDF – cards packed on pages', 'As many cards on each page as fit, for cutting'] : [k, l, d]).map(([k, l, d]) => html`<label key=${k} className=${'fmt' + (cfg.format === k ? ' on' : '')}><input type="radio" name="fmt" checked=${cfg.format === k} onChange=${() => set({ format: k })} /><span><b>${l}</b>${cfg.format === k ? html`<span className="small muted">${d}</span>` : null}</span></label>`)}</div>
+      ${hasBack(tpl) ? html`<${Check} checked=${cfg.backSide !== false} onChange=${on => set({ backSide: on })}>Include the back side</${Check}>` : null}
       ${cfg.format === 'pdf-sheet' ? html`<details className="adv"><summary><${Icon} n="gear" size=${15} />Page settings <span className="muted small">(${cfg.page}, ${L.fits ? plural(L.perPage, 'card') + ' per page' : 'does not fit'})</span></summary>
         <div className="stack" style=${{ gap: 12, paddingTop: 12 }}>
           <div className="grid2"><${Fld} label="Page size"><select className="inp" value=${cfg.page} onChange=${e => set(autoFitCfg({ ...cfg, page: e.target.value }, tpl.card))}>${Object.keys(PAGE_SIZES).map(p => html`<option key=${p}>${p}</option>`)}</select><//>
