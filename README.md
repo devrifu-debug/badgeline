@@ -6,11 +6,11 @@ Make ID cards in bulk from a spreadsheet, right in the browser.
 
 ## What it does
 
-1. **Pick a template**: 27 ready-made designs (portrait, landscape, front & back, Bangla school ID and more), or upload your own design (PNG, JPG, SVG or PDF from Canva or Figma) and edit it.
-2. **Import data**: Excel (.xlsx) or CSV. Photos placed inside the Excel cells are picked up automatically, or upload photos / a ZIP named by ID or name.
-3. **Map fields**: columns are matched to card fields automatically; adjust if needed.
-4. **Preview & fix**: validation flags missing names, duplicate IDs, bad emails and missing photos.
-5. **Generate & export**: print-ready A4 PDF sheets (with cut marks and duplex backs), one PDF per card, or PNG/JPG images in a ZIP.
+1. **Choose design**: 27 ready-made designs (portrait, landscape, front & back, Bangla school ID and more), or upload your own design (PNG, JPG, SVG or PDF from Canva or Figma) and edit it.
+2. **Add people**: Excel (.xlsx) or CSV. Photos placed inside the Excel cells are picked up automatically, or upload photos / a ZIP named by ID or name.
+3. **Download**: check each card, then download a print-ready A4 PDF (with cut marks), a PDF with one card per page for card printers, or PNG images in a ZIP.
+
+Columns are matched to card fields automatically, and missing photos or information are flagged before you download.
 
 Everything runs locally in your browser. Spreadsheets and photos are never uploaded to a server. Templates and projects are saved in your browser's storage (IndexedDB).
 

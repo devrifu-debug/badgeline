@@ -296,6 +296,70 @@ table.tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
   h1{font-size:22px}
   .step .lbl{display:none}
 }
+
+/* ---- simple 3-step shell ---- */
+.app.simple{display:flex;flex-direction:column;height:100%}
+.app.simple .main{flex:1;min-height:0;padding-bottom:0}
+.shead{display:flex;align-items:center;gap:16px;padding:10px 24px;background:var(--surface);border-bottom:1px solid var(--line);min-height:62px}
+.sbrand{border:0;background:none;cursor:pointer;padding:0;color:var(--fg)}
+.shead-r{width:120px}
+.ssteps{display:flex;align-items:center;gap:6px;margin:0 auto}
+.ssep{width:28px;height:2px;background:var(--line);border-radius:2px}
+.sstep{display:flex;align-items:center;gap:9px;border:0;background:none;padding:8px 14px 8px 8px;border-radius:999px;cursor:pointer;color:var(--muted);font:600 14.5px var(--font-ui);white-space:nowrap}
+.sstep:hover{background:var(--surface-2);color:var(--fg)}
+.sstep .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;border:2px solid var(--line-2)}
+.sstep.done .n{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.sstep[aria-current="step"]{background:var(--accent-soft);color:var(--accent-ink)}
+.sstep[aria-current="step"] .n{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.spage{max-width:1100px;gap:22px}
+.shero h1{font-size:28px}
+.shero p{margin-top:6px;color:var(--muted);font-size:15px;max-width:70ch}
+.selbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-radius:var(--r);background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--accent)}
+.selbar .grow{min-width:160px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+.dcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:border-color .12s,box-shadow .12s}
+.dcard:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.dcard.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.dthumb{height:176px;display:grid;place-items:center;background:var(--surface-2);border:0;cursor:pointer;padding:12px;position:relative}
+.dthumb img{position:absolute;inset:12px;width:calc(100% - 24px);height:calc(100% - 24px);object-fit:contain}
+.dmeta{padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.dname{font-weight:600;font-size:13.5px;line-height:1.3}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+.two.dl{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.num-badge{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--accent);color:var(--accent-fg);font-size:12px;margin-right:8px;vertical-align:2px}
+.loaded{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r);background:var(--surface-2)}
+.loaded.ok{background:var(--ok-soft);color:var(--ok)}
+.loaded.ok b{color:inherit}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent-ink);font:inherit;font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.adv summary{cursor:pointer;display:flex;align-items:center;gap:8px;font-weight:600;list-style:none;padding:12px 16px}
+.adv summary::-webkit-details-marker{display:none}
+details.adv:not(.panel) summary{padding:8px 0}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 18px}
+.mrow{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:10px;font-size:13px;font-weight:600}
+.inp.bad{border-color:var(--warn)}
+.stepnav{display:flex;justify-content:space-between;align-items:center;padding-top:4px}
+.fmts{display:flex;flex-direction:column;gap:8px}
+.fmt{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);cursor:pointer;background:var(--surface)}
+.fmt input{margin-top:3px;accent-color:var(--accent)}
+.fmt > span{display:flex;flex-direction:column;gap:2px}
+.fmt.on{border-color:var(--accent);background:var(--accent-soft)}
+.dlbtn{width:100%;justify-content:center;height:52px;font-size:16px}
+.issues.sm{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:var(--r)}
+@media (max-width:900px){
+  .two,.two.dl{grid-template-columns:minmax(0,1fr)}
+  .shead{padding:8px 12px;gap:8px}
+  .shead-r{display:none}
+  .sbrand b{display:none}
+  .app.simple .main{padding-bottom:0}
+  .app.simple .toasts{bottom:16px}
+}
+@media (max-width:600px){
+  .sstep .lbl{display:none}
+  .sstep[aria-current="step"] .lbl{display:inline}
+  .ssep{width:12px}
+  .dgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .shero h1{font-size:23px}
+}
 </style>
 
 </head>
@@ -2815,16 +2879,207 @@ class ErrorBoundary extends React.Component {
 }
 function App() {
   const route = useS(s => s.route);
-  const view = { dashboard: Dashboard, templates: TemplatesView, editor: EditorView, import: ImportView, generate: GenerateView, projects: ProjectsView, settings: SettingsView }[route] || Dashboard;
-  return html`<div className="app">
-    <${Nav} />
+  const view = { templates: DesignView, editor: EditorView, import: PeopleView, generate: DownloadView }[route] || DesignView;
+  return html`<div className="app simple">
+    <${SimpleHeader} />
     <div className="main">
-      <${TopBar} />
       <main id="content" className=${'content' + (route === 'editor' ? ' ed-content' : '')}><${ErrorBoundary} key=${route}><${view} /><//></main>
     </div>
     <${Toasts} /><${ModalHost} />
   </div>`;
 }
+
+/* ---------- Simple 3-step UI: Choose design → Add people → Download ---------- */
+const SIMPLE_STEPS = [['templates', 'Choose design'], ['import', 'Add people'], ['generate', 'Download']];
+function SimpleHeader() {
+  const route = useS(s => s.route); const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const dirty = useS(s => s.editor?.dirty);
+  const cur = route === 'editor' ? 'templates' : route;
+  const done = { templates: !!tpl, import: !!(ds && ds.rows.length && !ds.isExample), generate: false };
+  return html`<header className="shead">
+    <button className="brand sbrand" onClick=${() => go('templates')} aria-label="Badgeline home"><span className="brand-mark" aria-hidden="true"></span><b>Badgeline</b></button>
+    <nav className="ssteps" aria-label="Steps">${SIMPLE_STEPS.map(([r, label], i) => html`<${Fragment} key=${r}>${i ? html`<span className="ssep" aria-hidden="true"></span>` : null}
+      <button className=${'sstep' + (done[r] && cur !== r ? ' done' : '')} aria-current=${cur === r ? 'step' : undefined} onClick=${() => go(r)}>
+        <span className="n">${done[r] && cur !== r ? html`<${Icon} n="check" size=${13} />` : i + 1}</span><span className="lbl">${label}${r === 'templates' && dirty ? ' •' : ''}</span></button><//>`)}</nav>
+    <span className="shead-r"></span>
+  </header>`;
+}
+function StepNav({ back, next, nextLabel, nextDisabled }) {
+  return html`<div className="stepnav">${back ? html`<button className="btn" onClick=${() => go(back)}><${Icon} n="left" />Back</button>` : html`<span></span>`}
+    ${next ? html`<button className="btn primary lg" disabled=${nextDisabled} onClick=${() => go(next)}>${nextLabel}<${Icon} n="arrowRight" /></button>` : null}</div>`;
+}
+
+/* Step 1 */
+function DesignView() {
+  const list = useS(s => s.templates); const cur = useS(s => s.template);
+  const [tag, setTag] = useState('All'); const starters = useMemo(() => STARTERS.map(s => ({ ...s, tpl: s.make() })), []);
+  const shown = tag === 'All' ? starters : starters.filter(s => s.tags.includes(tag));
+  const pick = t => { useTemplate(t, { silent: true }); go('import'); };
+  const openSaved = async (id, edit) => { try { const t = await Persist.loadTemplate(id); if (!t) return; edit ? openInEditor(t) : pick(t); } catch (e) { toast(e.message || 'Could not open that design.', 'err'); } };
+  return html`<div className="page spage">
+    <div className="shero"><h1>Choose a card design</h1><p>Pick a ready-made design or upload your own. You can change any text, colour or position with <b>Edit</b>.</p></div>
+    ${cur ? html`<div className="selbar"><${Icon} n="check" /><span className="grow">Selected: <b>${cur.name}</b></span>
+      <button className="btn" onClick=${() => openInEditor(cur)}><${Icon} n="edit" size=${15} />Edit</button>
+      <button className="btn primary" onClick=${() => go('import')}>Next: add people<${Icon} n="arrowRight" /></button></div>` : null}
+    ${list.length ? html`<section className="stack" style=${{ gap: 12 }}><h2>My designs</h2>
+      <div className="dgrid">${list.map(t => html`<article key=${t.id} className=${'dcard' + (cur?.id === t.id ? ' on' : '')}>
+        <button className="dthumb" onClick=${() => openSaved(t.id)} aria-label=${'Use ' + t.name}>${t.thumb ? html`<img src=${t.thumb} alt="" />` : html`<${Icon} n="cards" size=${28} />`}</button>
+        <div className="dmeta"><span className="dname">${t.name}</span>
+          <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => openSaved(t.id)}>Use</button><button className="btn sm" onClick=${() => openSaved(t.id, true)}>Edit</button>
+          <${ConfirmBtn} label="" confirm="Delete design?" onConfirm=${async () => { await Persist.deleteTemplate(t.id); await refreshTemplates(); toast('Design deleted'); }} /></div></div></article>`)}</div></section>` : null}
+    <section className="stack" style=${{ gap: 12 }}>
+      <div className="row" style=${{ justifyContent: 'space-between' }}><h2>Ready-made designs</h2>
+        <div className="row"><button className="btn" onClick=${() => openDesignUpload(false)}><${Icon} n="upload" />Upload my design</button><button className="btn ghost" onClick=${() => openInEditor('new')}><${Icon} n="plus" />Blank card</button></div></div>
+      <div className="filters" role="group" aria-label="Filter designs">${STARTER_TAGS.filter(t => t === 'All' || STARTERS.some(s => s.tags.includes(t))).map(t => html`<button key=${t} aria-pressed=${tag === t} onClick=${() => setTag(t)}>${t}</button>`)}</div>
+      <div className="dgrid">${shown.map(s => html`<article key=${s.key} className="dcard">
+        <button className="dthumb" onClick=${() => pick(s.make())} aria-label=${'Use ' + s.name}><${CardPreview} tpl=${s.tpl} row=${null} useData=${false} maxW=${150} maxH=${150} /></button>
+        <div className="dmeta"><span className="dname">${s.name}</span>
+          <div className="row nowrap" style=${{ gap: 4 }}><button className="btn sm primary" onClick=${() => pick(s.make())}>Use</button><button className="btn sm" onClick=${() => openInEditor(s.make())}>Edit</button></div></div></article>`)}</div>
+    </section>
+  </div>`;
+}
+
+/* Step 2 */
+function PeopleView() {
+  const ds = useS(s => s.dataset); const tpl = useS(s => s.template); const v = useS(s => s.validation); const rev = useS(s => s.rev);
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [q, setQ] = useState('');
+  if (!tpl) return html`<div className="page spage"><div className="panel empty"><p>Choose a card design first.</p><button className="btn primary" onClick=${() => go('templates')}>Choose design</button></div></div>`;
+  const load = async f => {
+    setBusy(true); setErr('');
+    try { const d = await parseSpreadsheetFile(f); if (!d.columns.length) throw new Error('No data found in that file. The first row should hold the column names.'); setDataset(d); toast(`Loaded ${plural(d.rows.length, 'person', 'people')}${d.embeddedPhotos ? ` and ${plural(d.embeddedPhotos, 'photo')}` : ''}`); }
+    catch (e) { setErr(e.message || 'That file could not be read. Save it as .xlsx or .csv and try again.'); }
+    setBusy(false);
+  };
+  const own = ds && !ds.isExample;
+  const used = [...usedFieldKeys(tpl)]; const imgKeys = new Set(tpl.fields.filter(f => f.type === 'image').map(f => f.key));
+  const unmatched = ds ? tpl.fields.filter(f => used.includes(f.key) && !imgKeys.has(f.key) && !(S().mapping[f.key] && ds.columns.includes(S().mapping[f.key]))) : [];
+  return html`<div className="page spage">
+    <div className="shero"><h1>Add people</h1><p>Upload your Excel or CSV list, one person per row. Photos pasted inside the Excel file are placed on the cards automatically.</p></div>
+    ${ds?.isExample ? html`<div className="banner"><${Icon} n="info" /><div className="grow">You're seeing <b>12 example people</b> (AI-generated faces). Upload your own list to replace them.</div></div>` : null}
+    ${err ? html`<div className="banner err"><${Icon} n="alert" /><div className="grow">${err}</div></div>` : null}
+    <div className="two">
+      <section className="panel" id="sec-data"><div className="panel-head"><h2><span className="num-badge">A</span>Your list</h2>${own ? html`<${ConfirmBtn} label="Remove" confirm="Remove list?" onConfirm=${() => setDataset(null)} />` : null}</div>
+        <div className="panel-body">
+          ${own ? html`<div className="loaded"><${Icon} n="table" size=${22} /><div className="grow"><b>${ds.fileName}</b><div className="small muted">${plural(ds.rows.length, 'person', 'people')}</div></div></div>
+            <${Dropzone} accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv" onFiles=${fs => load(fs[0])}><span className="small"><b>Replace</b> with another file</span><//>`
+          : html`<${Dropzone} id="sheet-file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv" onFiles=${fs => load(fs[0])}>
+              <${Icon} n="table" size=${30} /><b>${busy ? 'Reading…' : 'Drop your Excel or CSV file here'}</b><span className="small">or click to choose a file</span><//>`}
+          <div className="row small" style=${{ gap: 6 }}><span className="muted">No list yet?</span>
+            <button className="linkbtn" onClick=${downloadExcelTemplate}>Download an empty Excel for this design</button><span className="muted">or</span>
+            <button className="linkbtn" onClick=${addPerson}>type names here</button></div>
+        </div></section>
+      <${SimplePhotos} />
+    </div>
+    ${ds && unmatched.length ? html`<div className="banner warn"><${Icon} n="alert" /><div className="grow">We couldn't find a column for: <b>${unmatched.map(f => f.label).join(', ')}</b>. Match them below so they appear on the cards.</div></div>` : null}
+    ${ds ? html`<${MatchColumns} open=${unmatched.length > 0} />` : null}
+    ${ds ? html`<section className="panel"><div className="panel-head"><h2>People on the list</h2>
+        <div className="row"><input className="inp" style=${{ width: 220 }} placeholder="Search…" value=${q} onChange=${e => setQ(e.target.value)} aria-label="Search people" />
+        <button className="btn sm" onClick=${addPerson}><${Icon} n="plus" size=${14} />Add person</button></div></div>
+      <div className="panel-body"><p className="tiny muted">Click any cell to change it. Click a row number to see that person's card or change their photo.</p><${DataTable} ds=${ds} query=${q} height=${340} /></div></section>` : null}
+    <${StepNav} back="templates" next="generate" nextLabel="Next: check and download" nextDisabled=${!ds?.rows.length} />
+  </div>`;
+}
+function SimplePhotos() {
+  const ds = useS(s => s.dataset); const tpl = useS(s => s.template); useS(s => s.photoVersion);
+  const stats = usePhotoStats(); const [busy, setBusy] = useState('');
+  const hasPhoto = imageFieldKeys(tpl).length > 0;
+  const add = async files => {
+    setBusy('Reading photos…');
+    try { if (PhotoLib.isExample) PhotoLib.clear(); const r = await readPhotoFiles(files, setBusy); Store.set(s => ({ photoVersion: s.photoVersion + 1 })); touch(); toast(`Added ${plural(r.added, 'photo')}`, r.added ? 'info' : 'err'); }
+    catch (e) { toast('Could not read those files: ' + (e.message || ''), 'err'); }
+    setBusy('');
+  };
+  const pk = imageFieldKeys(tpl)[0]; const people = ds ? ds.rows.length : 0;
+  const withPhoto = stats && pk ? ds.rows.reduce((n, _, i) => n + (photoFor(i, pk).status === 'found' ? 1 : 0), 0) : 0;
+  return html`<section className="panel" id="sec-photos"><div className="panel-head"><h2><span className="num-badge">B</span>Photos <span className="muted small" style=${{ fontWeight: 400 }}>(optional)</span></h2>
+      ${PhotoLib.entries.length && !PhotoLib.isExample ? html`<${ConfirmBtn} label="Clear" confirm="Remove all photos?" onConfirm=${() => { PhotoLib.clear(); Store.set(s => ({ photoVersion: s.photoVersion + 1 })); touch(); }} />` : null}</div>
+    <div className="panel-body">
+      ${!hasPhoto ? html`<p className="muted small">This design has no photo.</p>` : html`<${Fragment}>
+        <${Dropzone} accept="image/*,.zip" multiple folder onFiles=${add}><${Icon} n="photo" size=${30} /><b>${busy || 'Drop photos or a ZIP here'}</b>
+          <span className="small">Name each photo after the person or their ID, e.g. <i>Rifat Reza.jpg</i> or <i>EMP001.png</i></span><//>
+        ${ds ? html`<div className=${'loaded ' + (withPhoto === people ? 'ok' : '')}><${Icon} n=${withPhoto === people ? 'check' : 'photo'} size=${20} /><div className="grow"><b>${withPhoto} of ${people}</b> people have a photo</div></div>
+          ${stats?.missing.length ? html`<div className="chips">${stats.missing.slice(0, 12).map(m => html`<button key=${m.i} className="pill err" style=${{ border: 0, cursor: 'pointer' }} title="Click to choose a photo" onClick=${() => Store.set({ modal: { type: 'row', row: m.i } })}>${(cellValue(m.i, 'name') || 'Row ' + (m.i + 1)).slice(0, 26)}</button>`)}${stats.missing.length > 12 ? html`<span className="small muted">+${stats.missing.length - 12} more</span>` : null}</div>
+            <p className="tiny muted">Click a name to pick their photo by hand.</p>` : null}` : null}<//>`}
+    </div></section>`;
+}
+function MatchColumns({ open }) {
+  const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const mapping = useS(s => s.mapping);
+  const used = usedFieldKeys(tpl); const fields = tpl.fields.filter(f => used.has(f.key) && f.type !== 'image');
+  const setMap = (k, c) => { Store.set(s => ({ mapping: { ...s.mapping, [k]: c || undefined }, mappingAuto: { ...s.mappingAuto, [k]: false } })); touch(); };
+  return html`<details className="panel adv" open=${open} id="sec-map"><summary><${Icon} n="gear" size=${15} />Match columns <span className="muted small">(only if a card shows the wrong data)</span></summary>
+    <div className="panel-body"><div className="mgrid">${fields.map(f => { const col = mapping[f.key]; const ok = col && ds.columns.includes(col);
+      return html`<label key=${f.key} className="mrow"><span>${f.label}</span><select className=${'inp' + (ok ? '' : ' bad')} value=${ok ? col : ''} onChange=${e => setMap(f.key, e.target.value)}><option value="">— not on the list —</option>${ds.columns.map(c => html`<option key=${c} value=${c}>${c}</option>`)}</select></label>`; })}</div></div></details>`;
+}
+
+/* Step 3 */
+async function downloadAll() {
+  try {
+    if (!S().validation || S().validation.rev !== S().rev || S().validation.running) await runValidation();
+    const rows = rowsToInclude(); if (!rows.length) { toast('There are no cards to download. Fix the problems first or include them anyway.', 'err'); return; }
+    await runExport(S().exportCfg, rows);
+  } catch (e) { toast('Download failed: ' + (e.message || e), 'err'); }
+}
+const SIMPLE_FORMATS = [
+  ['pdf-sheet', 'PDF for printing', 'Several cards on each A4 page, with cut marks'],
+  ['pdf-cards', 'PDF, one card per page', 'For plastic ID card printers'],
+  ['zip-png', 'Images (PNG in a ZIP)', 'One picture file per person'],
+];
+function DownloadView() {
+  const tpl = useS(s => s.template); const ds = useS(s => s.dataset);
+  if (!tpl || !ds) return html`<div className="page spage"><div className="panel empty"><p>${!tpl ? 'Choose a card design first.' : 'Add your list of people first.'}</p><button className="btn primary" onClick=${() => go(!tpl ? 'templates' : 'import')}>${!tpl ? 'Choose design' : 'Add people'}</button></div></div>`;
+  return html`<div className="page spage">
+    <div className="shero"><h1>Check and download</h1><p>Look through the cards, then download them all in one file.</p></div>
+    <div className="two dl"><${SimplePreview} /><${SimpleDownload} /></div>
+    <${StepNav} back="import" />
+  </div>`;
+}
+function SimplePreview() {
+  const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const row = useS(s => s.previewRow); const v = useS(s => s.validation); const rev = useS(s => s.rev);
+  const n = ds.rows.length; const r = Math.min(row, n - 1); const fresh = v && v.rev === rev; const rs = fresh ? v.byRow.get(r) : null;
+  const nameKey = tpl.fields.find(f => f.key === 'name') ? 'name' : tpl.fields.find(f => f.type === 'text')?.key;
+  return html`<section className="panel" id="sec-preview"><div className="panel-head"><h2>Card preview</h2><span className="small muted num">${r + 1} of ${n}</span></div>
+    <div className="panel-body">
+      <div className="row nowrap"><button className="icon-btn" aria-label="Previous person" onClick=${() => Store.set({ previewRow: clamp(r - 1, 0, n - 1) })} disabled=${r <= 0}><${Icon} n="left" /></button>
+        <select className="inp grow" aria-label="Person" value=${r} onChange=${e => Store.set({ previewRow: +e.target.value })}>${(n > 3000 ? [...Array(3000).keys()] : ds.rows.map((_, i) => i)).map(i => html`<option key=${i} value=${i}>${i + 1}. ${(nameKey && cellValue(i, nameKey)) || '(no name)'}${fresh && v.byRow.get(i)?.errors ? '  ⚠' : ''}</option>`)}</select>
+        <button className="icon-btn" aria-label="Next person" onClick=${() => Store.set({ previewRow: clamp(r + 1, 0, n - 1) })} disabled=${r >= n - 1}><${Icon} n="right" /></button></div>
+      <div className="preview-box"><${CardSides} tpl=${tpl} row=${r} maxW=${hasBack(tpl) ? 520 : 360} maxH=${400} /></div>
+      ${rs ? html`<div className="stack" style=${{ gap: 4 }}>${rs.list.map((x, i) => html`<div key=${i} className=${'banner ' + (x.severity === 'error' ? 'err' : 'warn')} style=${{ padding: '7px 12px' }}><${Icon} n="alert" size=${14} /><span className="grow">${x.msg}</span></div>`)}</div>` : null}
+      <div className="row"><button className="btn sm" onClick=${() => Store.set({ modal: { type: 'row', row: r } })}><${Icon} n="edit" size=${14} />Change details or photo</button><button className="btn sm ghost" onClick=${() => openInEditor(tpl)}>Edit design</button></div>
+    </div></section>`;
+}
+function SimpleDownload() {
+  const tpl = useS(s => s.template); const ds = useS(s => s.dataset); const cfg = useS(s => s.exportCfg); const job = useS(s => s.exportJob);
+  const v = useS(s => s.validation); const rev = useS(s => s.rev); const policy = useS(s => s.errorPolicy);
+  const [showIssues, setShowIssues] = useState(false);
+  useEffect(() => { if (!['pdf-sheet', 'pdf-cards', 'zip-png'].includes(cfg.format)) Store.set(s => ({ exportCfg: { ...s.exportCfg, format: 'pdf-sheet' } })); }, []);
+  const set = p => Store.set(s => ({ exportCfg: { ...s.exportCfg, ...p } }));
+  const fresh = v && v.rev === rev && !v.running; const count = fresh ? rowsToInclude().length : ds.rows.length;
+  const L = sheetLayout(cfg, tpl.card); const running = job?.status === 'running' || job?.status === 'saving';
+  const errRows = fresh ? v.errorRows : 0; const errList = fresh ? v.issues.filter(x => x.severity === 'error') : [];
+  return html`<section className="panel"><div className="panel-head"><h2>Download</h2></div>
+    <div className="panel-body">
+      ${!fresh ? html`<div className="stack"><span className="small muted">Checking the list…</span><${Progress} value=${v?.progress || 0} /></div>`
+        : errRows ? html`<div className="banner warn"><${Icon} n="alert" /><div className="grow"><b>${plural(errRows, 'person', 'people')}</b> ${errRows === 1 ? 'has' : 'have'} missing or wrong information${policy === 'skip' ? ' and will be left out' : ''}.
+            <div className="row" style=${{ marginTop: 6, gap: 6 }}><button className="linkbtn" onClick=${() => setShowIssues(!showIssues)}>${showIssues ? 'Hide' : 'Show'} problems</button><span className="muted">·</span>
+            <${Check} checked=${policy === 'include'} onChange=${on => { Store.set({ errorPolicy: on ? 'include' : 'skip' }); }}>Include them anyway</${Check}></div></div></div>
+          ${showIssues ? html`<div className="issues sm">${errList.slice(0, 200).map((x, i) => html`<div key=${i} className="issue error"><span className="ln">${(cellValue(x.row, 'name') || 'Row ' + (x.row + 1)).slice(0, 22)}</span><span className="grow">${x.msg}</span><button className="btn sm" onClick=${() => Store.set({ previewRow: x.row, modal: { type: 'row', row: x.row } })}>Fix</button></div>`)}</div>` : null}`
+        : html`<div className="loaded ok"><${Icon} n="check" size=${20} /><div className="grow"><b>All ${plural(ds.rows.length, 'card')}</b> look good</div></div>`}
+      <div className="fmts" role="radiogroup" aria-label="File type">${SIMPLE_FORMATS.map(([k, l, d]) => html`<label key=${k} className=${'fmt' + (cfg.format === k ? ' on' : '')}><input type="radio" name="fmt" checked=${cfg.format === k} onChange=${() => set({ format: k })} /><span><b>${l}</b><span className="small muted">${d}</span></span></label>`)}</div>
+      ${hasBack(tpl) ? html`<${Check} checked=${cfg.backSide !== false} onChange=${on => set({ backSide: on })}>Include the back side</${Check}>` : null}
+      <button className="btn primary lg dlbtn" disabled=${running || !fresh || !count || (cfg.format === 'pdf-sheet' && !L.fits)} onClick=${downloadAll}><${Icon} n="download" size=${20} />${running ? 'Preparing…' : `Download ${plural(count, 'card')}`}</button>
+      ${running ? html`<div className="stack"><${Progress} value=${job.total ? job.done / job.total : 1} /><span className="small muted num">${job.label}${job.total ? ` · ${job.done}/${job.total}` : ''}</span></div>` : null}
+      ${job?.status === 'done' ? html`<div className="loaded ok"><${Icon} n="check" size=${18} /><div className="grow small">${job.label}</div></div>` : null}
+      ${job?.status === 'error' ? html`<span className="small" style=${{ color: 'var(--err)' }}>${job.label}</span>` : null}
+      ${cfg.format === 'pdf-sheet' ? html`<details className="adv"><summary><${Icon} n="gear" size=${15} />Page settings <span className="muted small">(${cfg.page}, ${L.fits ? plural(L.perPage, 'card') + ' per page' : 'does not fit'})</span></summary>
+        <div className="stack" style=${{ gap: 12, paddingTop: 12 }}>
+          <div className="grid2"><${Fld} label="Page size"><select className="inp" value=${cfg.page} onChange=${e => set(autoFitCfg({ ...cfg, page: e.target.value }, tpl.card))}>${Object.keys(PAGE_SIZES).map(p => html`<option key=${p}>${p}</option>`)}</select><//>
+            <${Fld} label="Orientation"><${Seg} label="Orientation" value=${cfg.orient} onChange=${o => set(autoFitCfg({ ...cfg, orient: o }, tpl.card))} options=${[['portrait', 'Portrait'], ['landscape', 'Landscape']]} /><//></div>
+          <div className="grid2"><${Fld} label="Cards across"><${NumIn} value=${cfg.cols} min=${1} max=${20} step=${1} dp=${0} onChange=${x => set({ cols: Math.round(x) })} /><//><${Fld} label="Cards down"><${NumIn} value=${cfg.rows} min=${1} max=${30} step=${1} dp=${0} onChange=${x => set({ rows: Math.round(x) })} /><//></div>
+          <div className="row"><${Check} checked=${cfg.cropMarks} onChange=${x => set({ cropMarks: x })}>Cut marks</${Check}><button className="btn sm" onClick=${() => set(autoFitCfg(cfg, tpl.card))}>Fit as many as possible</button></div>
+          <div className="stack" style=${{ alignItems: 'center' }}><${SheetPreview} L=${L} />${!L.fits ? html`<span className="small" style=${{ color: 'var(--err)' }}>That many cards don't fit on the page. Press "Fit as many as possible".</span>` : null}</div>
+        </div></details>` : null}
+    </div></section>`;
+}
+
 
 /* ---------- Dashboard ---------- */
 function Dashboard() {
@@ -2984,14 +3239,15 @@ function EditorView() {
   const t = ed.draft; const saved = isSaved(t.id); const inUse = workflowId === t.id;
   return html`<div style=${{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
     <div className="ed-toolbar" style=${{ gap: 8, padding: '8px 12px' }}>
+      <button className="btn ghost" onClick=${() => go('templates')}><${Icon} n="left" />Designs</button>
       <input className="name-inp" aria-label="Template name" value=${t.name} onChange=${e => edCommit(d => { d.name = e.target.value; }, 'name')} />
       <span className=${'pill ' + (ed.dirty ? 'warn' : saved ? 'ok' : '')}>${ed.dirty ? 'Unsaved changes' : saved ? 'Saved' : 'Not saved yet'}</span>
       <span className="grow"></span>
       <button className="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled=${!ed.past.length} onClick=${edUndo}><${Icon} n="undo" /></button>
       <button className="icon-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled=${!ed.future.length} onClick=${edRedo}><${Icon} n="redo" /></button>
       <button className="btn" onClick=${saveEditor} disabled=${saving}><${Icon} n="save" />${saving ? 'Saving…' : 'Save'}</button>
-      ${inUse ? html`<button className="btn primary" onClick=${() => go('import', S().dataset ? 'sec-map' : 'sec-data')}>Continue to data<${Icon} n="arrowRight" /></button>`
-        : html`<button className="btn primary" onClick=${() => { useTemplate(canonicalTpl(S().editor.draft)); go('import'); }}>Use for cards<${Icon} n="arrowRight" /></button>`}
+      ${inUse ? html`<button className="btn primary" onClick=${() => go('import', S().dataset ? 'sec-map' : 'sec-data')}>Next: add people<${Icon} n="arrowRight" /></button>`
+        : html`<button className="btn primary" onClick=${() => { useTemplate(canonicalTpl(S().editor.draft)); go('import'); }}>Use this design<${Icon} n="arrowRight" /></button>`}
     </div>
     ${t.source?.kind === 'upload' && usedFieldKeys(t).size === 0 ? html`<div className="banner" style=${{ borderRadius: 0 }}><${Icon} n="info" /><div className="grow">Your design (${t.source.fileName}) is the card background. Add what changes per person on top: <b>Data field</b> for text such as name or ID, and <b>Photo</b> for the employee photo. To hide sample text that is part of the picture, select <b>Cover</b>.</div>
       <div className="row"><button className="btn sm" onClick=${() => addEl(makeEl('text', t.card, { text: '{{name}}', name: 'Name', size: 11, weight: 700 }))}>Add name</button><button className="btn sm" onClick=${() => { const k = t.fields.find(f => f.type === 'image')?.key || 'photo'; addEl(makeEl('image', t.card, { field: k })); }}>Add photo</button></div></div>` : null}
@@ -3355,9 +3611,9 @@ function CardProps() {
           : html`<input className="inp" value=${e.text} onChange=${ev => updEl(e.id, { text: ev.target.value }, 'text' + e.id)} />`}<//>`)}`
         : html`<p className="small muted">No fixed text on this side yet. Use "Text" in the toolbar.</p>`}</div>
     <div className="sec"><h3>Filled from the spreadsheet</h3>
-      ${mixed.length ? html`<div className="stack" style=${{ gap: 4 }}>${mixed.map(e => html`<button key=${e.id} className="layer" style=${{ border: 0, background: 'none', textAlign: 'left', width: '100%' }} onClick=${() => edSelect(e.id)}><${Icon} n=${e.type === 'barcode' ? 'braces' : 'braces'} size=${13} /><span className="lname mono tiny">${e.text}</span></button>`)}</div>`
+      ${mixed.length ? html`<div className="stack" style=${{ gap: 4 }}>${mixed.map(e => html`<button key=${e.id} className="layer" style=${{ border: 0, background: 'none', textAlign: 'left', width: '100%' }} onClick=${() => edSelect(e.id)}><${Icon} n=${e.type === 'barcode' ? 'barcode' : 'braces'} size=${13} /><span className="lname small">${(e.type === 'barcode' ? 'Barcode: ' : '') + e.text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_, k) => t.fields.find(f => f.key === k)?.label || k).replace(/^[:\s]+/, '')}</span></button>`)}</div>`
         : html`<p className="small muted">Nothing yet. Use "Data field" in the toolbar to add a name, ID or other per-person text.</p>`}
-      ${used.length ? html`<div className="chips">${used.map(k => html`<${FieldChip} key=${k} k=${k} img=${t.fields.find(f => f.key === k)?.type === 'image'} />`)}</div>` : null}</div>
+</div>
     <div className="sec"><h3>Card size</h3>
       <select className="inp" aria-label="Card size" value=${c.preset || 'custom'} onChange=${e => { const p = CARD_PRESETS.find(x => x.id === e.target.value); if (p) setCard({ w: p.w, h: p.h, radius: p.radius, preset: p.id }); else setCard({ preset: 'custom' }); }}>
         ${CARD_PRESETS.map(p => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}<option value="custom">Custom size</option></select>
@@ -3490,7 +3746,7 @@ function DataTable({ ds, height = 380, query = '' }) {
   const rows = []; for (let k = start; k < end; k++) rows.push(visible ? visible[k] : k);
   return html`<div className="tbl-wrap" tabIndex="0" style=${{ maxHeight: height }} onScroll=${e => setScroll(e.currentTarget.scrollTop)}
     onPaste=${e => { if (e.target.tagName === 'INPUT') return; const t = e.clipboardData?.getData('text/plain'); if (!t || (!t.includes('\t') && !t.includes('\n'))) return; e.preventDefault(); const n = pasteRows(t); if (n) toast(`Added ${plural(n, 'row')} from the clipboard`); }}>
-    <table className="tbl"><thead><tr><th className="rn">Row</th>${showPhoto ? html`<th>Card photo</th>` : null}${ds.columns.map(c => html`<th key=${c}>${c}${colFields[c] ? html`<span className="th-map">${colFields[c].map(k => html`<${FieldChip} key=${k} k=${k} />`)}</span>` : null}</th>`)}</tr></thead>
+    <table className="tbl"><thead><tr><th className="rn">Row</th>${showPhoto ? html`<th>Card photo</th>` : null}${ds.columns.map(c => html`<th key=${c}>${c}</th>`)}</tr></thead>
     <tbody>
       ${start > 0 ? html`<tr style=${{ height: start * RH }}><td colSpan=${ds.columns.length + 2} style=${{ border: 0, padding: 0 }}></td></tr>` : null}
       ${rows.map(i => { const rs = fresh ? v.byRow.get(i) : null; return html`<tr key=${i} className=${rs ? (rs.errors ? 'has-err' : 'has-warn') : ''}>
@@ -3898,7 +4154,7 @@ function ProjectsView() {
     <section className="stack" style=${{ gap: 12 }}><h2>Saved projects</h2>
       ${!list.length ? html`<div className="panel empty"><p>No saved projects yet.</p></div>` : html`<div className="panel">${list.map(p => html`<div key=${p.id} className="row" style=${{ padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
         <div className="grow" style=${{ minWidth: 200 }}><div style=${{ fontWeight: 600 }}>${p.name}${project.id === p.id ? html` <span className="pill acc">Open</span>` : null}</div><div className="small muted">${p.templateName} · ${p.fileName || 'no file'} · ${plural(p.rowCount || 0, 'row')} · ${timeAgo(p.updatedAt)}</div></div>
-        <button className="btn sm" onClick=${async () => { try { await openProject(p.id); go('dashboard'); } catch (e) { toast(e.message, 'err'); } }}>Open</button>
+        <button className="btn sm" onClick=${async () => { try { await openProject(p.id); go('templates'); } catch (e) { toast(e.message, 'err'); } }}>Open</button>
         <${ConfirmBtn} label="" confirm="Delete project?" onConfirm=${async () => { await Persist.deleteProject(p.id); if (project.id === p.id) Store.set({ project: { id: null, name: project.name } }); refreshProjects(); }} /></div>`)}</div>`}
     </section></div>`;
 }
@@ -3929,7 +4185,7 @@ function SettingsView() {
   const settings = { ...DEFAULT_SETTINGS, ...lsGet('settings', {}) };
   const tpl = starterTravel(); tpl.name = 'Skyline Travels staff ID (example)';
   const ds = exampleDataset(); const { map, auto } = suggestMapping(tpl.fields, ds.columns);
-  Store.set({ route: 'dashboard', tick: 0, rev: 1, template: tpl, dataset: ds, mapping: map, mappingAuto: auto, photoFallback: '', photoVersion: 0,
+  Store.set({ route: 'templates', tick: 0, rev: 1, template: tpl, dataset: ds, mapping: map, mappingAuto: auto, photoFallback: '', photoVersion: 0,
     validation: null, generation: null, exportJob: { status: 'idle' }, exportCfg: defaultExportCfg(tpl.card), errorPolicy: 'skip', previewRow: 0, settings,
     templates: [], templatesLoaded: false, projects: [], storageMode: 'connecting', editor: null, toasts: [], modal: null, saving: false, project: { id: null, name: 'Skyline Travels staff cards' } });
   AssetCache.ensure(tpl);
