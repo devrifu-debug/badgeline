@@ -2,14 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-58WMZXKYM8"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-58WMZXKYM8');
+<script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "yvfjng5ox6");
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Badgeline: design ID card templates, import an Excel/CSV list with photos, and export print-ready PDF, PNG or ZIP cards in bulk.">
@@ -3122,7 +3120,7 @@ async function refreshTemplates() {
 async function refreshProjects() {
   try { const list = await Persist.listProjects(); list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); Store.set({ projects: list }); } catch (e) { console.warn(e); }
 }
-function track(name, params) { try { if (typeof window.gtag === 'function') window.gtag('event', name, params || {}); } catch (e) {} }
+function track(name, params) { try { if (typeof window.clarity === 'function') { window.clarity('event', name); for (const [k, v] of Object.entries(params || {})) window.clarity('set', k, String(v)); } } catch (e) {} }
 function useTemplate(t, { silent } = {}) {
   track('design_chosen', { design_name: t?.name || 'untitled' });
   const st = S(); const tpl = cloneTpl(t); AssetCache.ensure(tpl);
