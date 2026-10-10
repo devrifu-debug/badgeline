@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-58WMZXKYM8"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-58WMZXKYM8');
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Badgeline: design ID card templates, import an Excel/CSV list with photos, and export print-ready PDF, PNG or ZIP cards in bulk.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='7' width='26' height='18' rx='3' fill='%230F6B5C'/%3E%3Ccircle cx='11' cy='15' r='3' fill='white'/%3E%3Crect x='16' y='12' width='9' height='2' fill='white'/%3E%3Crect x='16' y='16' width='7' height='2' fill='white'/%3E%3C/svg%3E">
@@ -2077,6 +2086,7 @@ async function runExport(cfg, rows) {
     const { blob, filename } = await exportCards(cfg, rows);
     Store.set({ exportJob: { status: 'saving', label: 'Waiting for you to confirm the download' } });
     await saveFile(filename, blob);
+    track('cards_downloaded', { format: cfg.format, cards: (rows || S().generation?.items || []).length, size_mb: +(blob.size / 1048576).toFixed(1) });
     Store.set({ exportJob: { status: 'done', label: `Saved ${filename} (${(blob.size / 1048576).toFixed(1)} MB)` } });
     toast(`Saved ${filename}`);
   } catch (e) {
@@ -3112,7 +3122,9 @@ async function refreshTemplates() {
 async function refreshProjects() {
   try { const list = await Persist.listProjects(); list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); Store.set({ projects: list }); } catch (e) { console.warn(e); }
 }
+function track(name, params) { try { if (typeof window.gtag === 'function') window.gtag('event', name, params || {}); } catch (e) {} }
 function useTemplate(t, { silent } = {}) {
+  track('design_chosen', { design_name: t?.name || 'untitled' });
   const st = S(); const tpl = cloneTpl(t); AssetCache.ensure(tpl);
   const patch = { template: tpl, generation: null };
   if (st.dataset) { const { map, auto } = suggestMapping(tpl.fields, st.dataset.columns, st.mapping); patch.mapping = map; patch.mappingAuto = { ...st.mappingAuto, ...auto }; }
@@ -3121,6 +3133,7 @@ function useTemplate(t, { silent } = {}) {
   if (!silent) toast(`Using "${tpl.name}" for this card run`);
 }
 function setDataset(ds) {
+  if (ds && ds.fileName !== 'Typed in Badgeline') track('list_uploaded', { people: ds.rows?.length || 0, photos: ds.embeddedPhotos || 0 });
   const st = S(); GenStore.clear();
   const patch = { dataset: ds, previewRow: 0, generation: null, validation: null };
   if (ds && !ds.isExample && PhotoLib.isExample) { PhotoLib.clear(); patch.photoVersion = st.photoVersion + 1; }
@@ -4394,6 +4407,7 @@ async function demoPicture(kind, i, name) {
   return new Promise(r => c.toBlob(b => r(b), 'image/png'));
 }
 async function downloadExcelTemplate() {
+  track('demo_sheet_downloaded');
   const tpl = S().template; if (!tpl) { toast('Choose a design first.', 'err'); return; }
   try {
     await ensureFonts({ ...tpl, elements: [{ type: 'text', font: 'Great Vibes', weight: 400 }] }).catch(() => {});
